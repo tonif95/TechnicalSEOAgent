@@ -1,29 +1,56 @@
 import os
 import json
+import sqlite3 # Importar la librería de SQLite
 from agents import Agent, Runner # Asume que 'agents' está disponible en tu entorno
 from dotenv import load_dotenv
 
 # --- Constantes ---
-RESULTS_DIR = "resultados"
-JSON_FILE_NAME = "all_analysis_results.json"
+DB_NAME = "crawler_results.db" # Usar el mismo nombre de la base de datos
 load_dotenv(dotenv_path="../.env") # Asegúrate de que la ruta a tu .env sea correcta
 
-# Función para cargar el archivo JSON
-def load_analysis_results():
+# Función para cargar los resultados del análisis desde la base de datos
+def load_analysis_results_from_db():
     """
-    Carga los resultados del análisis SEO desde un archivo JSON.
+    Carga todos los resultados del análisis SEO desde la base de datos SQLite.
 
     Returns:
-        dict: Un diccionario con los datos del análisis.
+        list: Una lista de diccionarios, donde cada diccionario contiene
+              los resultados de análisis de una URL.
     Raises:
-        FileNotFoundError: Si no se encuentra el archivo JSON.
+        Exception: Si hay un error al conectar o consultar la base de datos.
     """
-    json_filepath = os.path.join(RESULTS_DIR, JSON_FILE_NAME)
-    if not os.path.exists(json_filepath):
-        raise FileNotFoundError(f"No se encontró el archivo '{json_filepath}'")
+    conn = None # Inicializar conn a None
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute("SELECT url, analysis_results FROM crawled_pages")
+        
+        all_results = []
+        for row in cursor.fetchall():
+            url = row[0]
+            analysis_json_str = row[1]
+            try:
+                # Cargar la cadena JSON de nuevo a un diccionario Python
+                analysis_data = json.loads(analysis_json_str)
+                all_results.append(analysis_data)
+            except json.JSONDecodeError as e:
+                print(f"Advertencia: Error al decodificar JSON para URL {url}: {e}")
+                # Si el JSON está corrupto, podemos omitir este registro o manejarlo de otra forma.
+                # Por ahora, simplemente lo saltamos.
 
-    with open(json_filepath, 'r', encoding='utf-8') as f:
-        return json.load(f)
+        if not all_results:
+            raise Exception(f"No se encontraron resultados en la base de datos '{DB_NAME}'. Asegúrate de que el rastreo se haya ejecutado y guardado datos.")
+        
+        return all_results
+
+    except sqlite3.Error as e:
+        raise Exception(f"Error de base de datos al cargar resultados: {e}")
+    except Exception as e:
+        raise e # Re-lanzar otras excepciones
+    finally:
+        if conn:
+            conn.close()
+
 
 # Función principal para orquestar la generación del informe SEO
 def generate_technical_seo_report():
@@ -47,10 +74,11 @@ def generate_technical_seo_report():
     seo_analyzer_agent = Agent(
         name="Technical SEO Expert Agent",
         instructions=instructions_analyzer,
-        model="gpt-4o-mini"
+        model="gpt-4o-mini" # O el modelo que prefieras
     )
 
-    loaded_results = load_analysis_results()
+    # Cargar los resultados desde la base de datos
+    loaded_results = load_analysis_results_from_db()
 
     prompt_analyzer = f"""
     Eres un experto en SEO técnico con mucha experiencia en auditorías completas de sitios web.
@@ -66,7 +94,7 @@ def generate_technical_seo_report():
 
     Para cada página, también incluye un listado breve con los errores técnicos más importantes detectados, en formato de puntos (bullet points).
 
-    Evita dar explicaciones técnicas muy complejas, sé claro y conciso y hazlo en español de españa.
+    Evita dar explicaciones técnicas muy complejas, sé claro y conciso y hazlo en español de España.
 
     Estos son los datos a analizar en JSON:
 
@@ -81,7 +109,6 @@ def generate_technical_seo_report():
     print("\n📋 Informe SEO técnico generado por el Analizador y almacenado en la variable 'analysis_report_content'.")
     print("--------------------------------------------------")
     
-
     return analysis_report_content
 
 # Este bloque solo se ejecuta si el script se corre directamente, no cuando se importa
@@ -91,7 +118,5 @@ if __name__ == "__main__":
         print("\n--- Contenido del informe (primeras 500 caracteres) ---")
         print(report_content[:500] + "..." if len(report_content) > 500 else report_content)
         print("\n--- Fin del contenido del informe ---")
-    except FileNotFoundError as e:
-        print(f"Error: {e}")
     except Exception as e:
-        print(f"Ocurrió un error inesperado: {e}")
+        print(f"Ocurrió un error: {e}")
