@@ -1,102 +1,79 @@
-import os
 import subprocess
-import time
+import sys
+import os
 
-# --- Constantes ---
-# Rutas a los scripts de los agentes. Asegúrate de que estas rutas son correctas
-# con respecto a donde ejecutarás master.py
-CRAWLER_SCRIPT_PATH = "crawler.py"
-ANALYZER_SCRIPT_PATH = "analyzer.py" # O "analyzer_agent.py" si lo renombraste
-STRATEGIST_SCRIPT_PATH = "strategist.py" # O "strategist_agent.py" si lo renombraste
+# --- Configuración ---
+# Define la ruta al script 'crawler.py'.
+# Ajusta esta ruta si 'crawler.py' no está en el mismo directorio que 'master.py'.
+CRAWLER_SCRIPT_PATH = os.path.join(os.path.dirname(__file__), 'crawler.py') # Asume que crawler.py está en el mismo directorio
 
-# Directorios para los resultados y los informes
-# Estos directorios deberían ser manejados por los scripts individuales,
-# pero los mantenemos aquí para mensajes informativos.
-RESULTS_DIR = "resultados"
-REPORTS_DIR = "informes"
+# Añade el directorio actual al sys.path para permitir importaciones locales
+# Esto es útil si 'strategist.py' y 'seo_utils.py' están en el mismo directorio que 'master.py'
+sys.path.append(os.path.dirname(__file__))
 
-# --- Función de Orquestación del Agente Maestro ---
-def run_full_seo_pipeline():
+try:
+    from strategist import SEOStrategist
+except ImportError as e:
+    print(f"Error al importar la clase SEOStrategist de strategist.py: {e}")
+    print("Asegúrate de que 'strategist.py' esté en el mismo directorio o en el PYTHONPATH.")
+    sys.exit(1)
+
+def run_full_seo_process():
     """
-    Orquesta la ejecución secuencial del Agente Crawler, Agente Analizador y Agente Estratega
-    llamando a sus scripts individuales.
+    Orquesta el proceso completo de SEO: rastreo y generación de plan estratégico.
     """
-    print("\n=======================================================")
-    print("🚀 Agente Maestro: Iniciando la Orquestación Completa del SEO")
-    print("=======================================================\n")
+    # 1. Solicitar la URL al usuario
+    target_url = input("Por favor, introduce la URL principal que deseas rastrear (ej: https://www.python.org): ")
+
+    if not target_url:
+        print("No se proporcionó ninguna URL. Saliendo.")
+        sys.exit(0) # Salida limpia si no hay URL
+
+    # 2. Ejecutar crawler.py
+    print(f"\n🚀 Iniciando la ejecución de {CRAWLER_SCRIPT_PATH} con la URL: {target_url}...")
+
+    if not os.path.exists(CRAWLER_SCRIPT_PATH):
+        print(f"Error: No se encontró el archivo '{CRAWLER_SCRIPT_PATH}'.")
+        print("Asegúrate de que la ruta al script 'crawler.py' sea correcta.")
+        sys.exit(1)
 
     try:
-        # Paso opcional: Asegurarse de que los directorios de salida existan,
-        # aunque los scripts individuales también deberían manejarlos.
-        os.makedirs(RESULTS_DIR, exist_ok=True)
-        os.makedirs(REPORTS_DIR, exist_ok=True)
-        print(f"Master Agent: Carpetas '{RESULTS_DIR}' y '{REPORTS_DIR}' aseguradas.")
+        # Ejecutar crawler.py pasando la URL como un argumento de línea de comandos
+        crawler_result = subprocess.run(
+            [sys.executable, CRAWLER_SCRIPT_PATH, target_url], # Pasa target_url como argumento
+            capture_output=True,  # Captura stdout y stderr
+            text=True,            # Decodifica la salida como texto
+            check=True            # Lanza una CalledProcessError si el comando devuelve un código de salida distinto de cero
+        )
+        print("\n--- Salida de crawler.py (stdout) ---")
+        print(crawler_result.stdout)
+        if crawler_result.stderr:
+            print("\n--- Errores de crawler.py (stderr) ---")
+            print(crawler_result.stderr)
+        print("✅ Ejecución de crawler.py finalizada exitosamente.")
 
-        # --- FASE 1: Ejecutar el Agente Crawler ---
-        print(f"\n--- Agente Maestro: Paso 1/3 - Ejecutando Agente Crawler ({CRAWLER_SCRIPT_PATH}) ---")
-        try:
-            # Ejecuta el script del crawler. `check=True` lanzará un error si el script falla.
-            subprocess.run(["python", CRAWLER_SCRIPT_PATH], check=True, text=True, capture_output=True, encoding='utf-8')
-            print("Master Agent: Agente Crawler completado con éxito. Resultados generados en 'resultados/'.")
-        except FileNotFoundError:
-            print(f"¡Error! No se encontró el script del crawler en '{CRAWLER_SCRIPT_PATH}'. "
-                  "Asegúrate de que la ruta sea correcta y el archivo exista.")
-            raise
-        except subprocess.CalledProcessError as e:
-            print(f"¡Error! El Agente Crawler falló con código de salida {e.returncode}.")
-            print(f"Salida estándar del Crawler:\n{e.stdout}")
-            print(f"Salida de error del Crawler:\n{e.stderr}")
-            raise
+        # 3. Una vez que crawler.py ha terminado exitosamente, instanciar y ejecutar el estratega
+        print("\n--- Iniciando la generación del plan estratégico SEO ---")
+        strategist_instance = SEOStrategist()
+        strategic_plan = strategist_instance.generate_strategic_plan()
         
-        time.sleep(1) # Pequeña pausa para mejor legibilidad en la consola
+        if strategic_plan:
+            print("\n--- Plan Estratégico SEO Final ---")
+            print(strategic_plan)
+            print("\n--- Fin del Plan Estratégico SEO ---")
+        else:
+            print("❌ No se pudo generar el plan estratégico SEO.")
 
-        # --- FASE 2: Ejecutar el Agente Analizador ---
-        print(f"\n--- Agente Maestro: Paso 2/3 - Ejecutando Agente Analizador ({ANALYZER_SCRIPT_PATH}) ---")
-        try:
-            # Ejecuta el script del analizador.
-            subprocess.run(["python", ANALYZER_SCRIPT_PATH], check=True, text=True, capture_output=True, encoding='utf-8')
-            print("Master Agent: Agente Analizador completado con éxito. Informe guardado en 'informes/'.")
-        except FileNotFoundError:
-            print(f"¡Error! No se encontró el script del analizador en '{ANALYZER_SCRIPT_PATH}'. "
-                  "Asegúrate de que la ruta sea correcta y el archivo exista.")
-            raise
-        except subprocess.CalledProcessError as e:
-            print(f"¡Error! El Agente Analizador falló con código de salida {e.returncode}.")
-            print(f"Salida estándar del Analizador:\n{e.stdout}")
-            print(f"Salida de error del Analizador:\n{e.stderr}")
-            raise
-
-        time.sleep(1) # Pequeña pausa
-
-        # --- FASE 3: Ejecutar el Agente Estratega ---
-        print(f"\n--- Agente Maestro: Paso 3/3 - Ejecutando Agente Estratega ({STRATEGIST_SCRIPT_PATH}) ---")
-        try:
-            # Ejecuta el script del estratega.
-            subprocess.run(["python", STRATEGIST_SCRIPT_PATH], check=True, text=True, capture_output=True, encoding='utf-8')
-            print("Master Agent: Agente Estratega completado con éxito. Plan guardado en 'informes/'.")
-        except FileNotFoundError:
-            print(f"¡Error! No se encontró el script del estratega en '{STRATEGIST_SCRIPT_PATH}'. "
-                  "Asegúrate de que la ruta sea correcta y el archivo exista.")
-            raise
-        except subprocess.CalledProcessError as e:
-            print(f"¡Error! El Agente Estratega falló con código de salida {e.returncode}.")
-            print(f"Salida estándar del Estratega:\n{e.stdout}")
-            print(f"Salida de error del Estratega:\n{e.stderr}")
-            raise
-
-        print("\n=======================================================")
-        print("✅ Agente Maestro: Proceso Completo de SEO Finalizado con Éxito.")
-        print(f"Revisa las carpetas '{RESULTS_DIR}' e '{REPORTS_DIR}' para los outputs.")
-        print("=======================================================\n")
-
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Error al ejecutar crawler.py: El script terminó con un error (código de salida {e.returncode}).")
+        print(f"Salida estándar:\n{e.stdout}")
+        print(f"Salida de error:\n{e.stderr}")
+    except FileNotFoundError:
+        print(f"❌ Error: El comando '{sys.executable}' (intérprete de Python) no se encontró.")
+        print("Asegúrate de que Python esté correctamente instalado y accesible en tu PATH.")
     except Exception as e:
-        print(f"\n❌ Agente Maestro: ¡Ha ocurrido un error inesperado durante la orquestación!")
-        print(f"Detalles: {e}")
-        # import traceback; traceback.print_exc() # Descomentar para depuración
-        print("\nEl proceso ha sido interrumpido.")
+        print(f"❌ Ocurrió un error inesperado durante el proceso: {e}")
 
-# --- Punto de Entrada del Agente Maestro ---
 if __name__ == "__main__":
-    run_full_seo_pipeline()
-
-
+    run_full_seo_process()
+    print("\nProceso de master.py finalizado.")

@@ -4,7 +4,8 @@ import os
 import re
 from urllib.parse import urlparse, urljoin
 import json
-import time # Importar para añadir un pequeño retraso entre solicitudes
+import time
+import sys # Importar sys para acceder a los argumentos de línea de comandos
 
 # Directorio donde se guardarán los resultados
 RESULTS_DIR = "resultados"
@@ -256,46 +257,49 @@ def analyze_html_content(url, parsed_soup_object):
 if __name__ == "__main__":
     create_results_directory() # Asegurarse de que la carpeta 'resultados' exista
 
-    target_url = input("Por favor, introduce la URL principal que deseas rastrear (ej: https://www.python.org): ")
+    # --- CAMBIO CLAVE: Obtener la URL de los argumentos de línea de comandos ---
+    if len(sys.argv) > 1:
+        target_url = sys.argv[1] # El primer argumento después del nombre del script es la URL
+    else:
+        print("Error: No se proporcionó ninguna URL. Uso: python crawler.py <URL>")
+        sys.exit(1) # Salir con error si no hay URL
+
     MAX_PAGES = 20 # Límite de páginas a rastrear
 
-    if target_url:
-        parsed_target_url = urlparse(target_url)
-        base_domain = parsed_target_url.netloc
+    parsed_target_url = urlparse(target_url)
+    base_domain = parsed_target_url.netloc
 
-        urls_to_crawl = [target_url] # Cola de URLs a rastrear, empieza con la principal
-        processed_urls = set()       # Conjunto de URLs ya procesadas
-        all_analysis_results = []    # Lista para almacenar todos los resultados
+    urls_to_crawl = [target_url] # Cola de URLs a rastrear, empieza con la principal
+    processed_urls = set()       # Conjunto de URLs ya procesadas
+    all_analysis_results = []    # Lista para almacenar todos los resultados
 
-        while urls_to_crawl and len(processed_urls) < MAX_PAGES:
-            current_url = urls_to_crawl.pop(0) # Obtener la siguiente URL de la cola
+    while urls_to_crawl and len(processed_urls) < MAX_PAGES:
+        current_url = urls_to_crawl.pop(0) # Obtener la siguiente URL de la cola
 
-            soup, found_links = get_html_and_parse(current_url, base_domain, processed_urls, MAX_PAGES)
-            
-            if soup:
-                analysis_results = analyze_html_content(current_url, soup)
-                if analysis_results:
-                    all_analysis_results.append(analysis_results)
-                    print(f"Análisis completado para: {current_url}")
+        soup, found_links = get_html_and_parse(current_url, base_domain, processed_urls, MAX_PAGES)
+        
+        if soup:
+            analysis_results = analyze_html_content(current_url, soup)
+            if analysis_results:
+                all_analysis_results.append(analysis_results)
+                print(f"Análisis completado para: {current_url}")
 
-                # Añadir nuevos enlaces encontrados a la cola si no han sido procesados y son del mismo dominio
-                for link in found_links:
-                    if link not in processed_urls and urlparse(link).netloc == base_domain:
-                        if len(processed_urls) < MAX_PAGES: # Comprobar el límite antes de añadir
-                            urls_to_crawl.append(link)
-                        else:
-                            break # Salir si se alcanzó el límite
+            # Añadir nuevos enlaces encontrados a la cola si no han sido procesados y son del mismo dominio
+            for link in found_links:
+                if link not in processed_urls and urlparse(link).netloc == base_domain:
+                    if len(processed_urls) < MAX_PAGES: # Comprobar el límite antes de añadir
+                        urls_to_crawl.append(link)
+                    else:
+                        break # Salir si se alcanzó el límite
 
-            time.sleep(1) # Pequeño retraso para no sobrecargar el servidor (ajustar si es necesario)
+        time.sleep(1) # Pequeño retraso para no sobrecargar el servidor (ajustar si es necesario)
 
-        # Guardar todos los resultados de todas las páginas en un único archivo JSON
-        output_filename = os.path.join(RESULTS_DIR, "all_analysis_results.json")
-        try:
-            with open(output_filename, 'w', encoding='utf-8') as f:
-                json.dump(all_analysis_results, f, indent=4, ensure_ascii=False)
-            print(f"\nResultados de análisis de {len(all_analysis_results)} páginas guardados en '{output_filename}'.")
-            print("Por favor, ejecuta 'python analyzer.py' para ver el resumen de la primera página o procesar todos los resultados.")
-        except Exception as e:
-            print(f"Error al guardar los resultados en JSON: {e}")
-    else:
-        print("No se proporcionó ninguna URL. Saliendo.")
+    # Guardar todos los resultados de todas las páginas en un único archivo JSON
+    output_filename = os.path.join(RESULTS_DIR, "all_analysis_results.json")
+    try:
+        with open(output_filename, 'w', encoding='utf-8') as f:
+            json.dump(all_analysis_results, f, indent=4, ensure_ascii=False)
+        print(f"\nResultados de análisis de {len(all_analysis_results)} páginas guardados en '{output_filename}'.")
+        print("Por favor, ejecuta 'python analyzer.py' para ver el resumen de la primera página o procesar todos los resultados.")
+    except Exception as e:
+        print(f"Error al guardar los resultados en JSON: {e}")

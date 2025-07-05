@@ -1,0 +1,539 @@
+[
+    {
+        "url": "https://antoniferrandis.com/",
+        "http_status": 200,
+        "final_url_after_redirects": "https://antoniferrandis.com/",
+        "title": "Antoni Ferrandis - Technical SEO",
+        "meta_description": "I’m Toni, a Technical SEO Expert specialized in automation and ranking strategies that boost sales. I scale websites through smart SEO and automated workflows.",
+        "meta_robots": "index, follow",
+        "viewport": "width=device-width, initial-scale=1",
+        "canonical_url": null,
+        "hreflang_tags": [],
+        "h1_tags": [
+            "I'm Toni, a Technical SEO Expertspecializing inDevelopmentto increase sales"
+        ],
+        "h2_tags": [
+            "Selected Projects",
+            "Project",
+            "About Me",
+            "Hong Kong",
+            "Stacks",
+            "Connect",
+            "Coding hours",
+            "Fav. framework",
+            "Latest Articles",
+            "Article",
+            "Article"
+        ],
+        "h3_h6_tags": [
+            {
+                "h3": "Let's Chat!"
+            },
+            {
+                "h3": "GitHub"
+            },
+            {
+                "h3": "Facebook"
+            },
+            {
+                "h3": "Instagram"
+            },
+            {
+                "h3": "X"
+            },
+            {
+                "h3": "YouTube"
+            },
+            {
+                "h3": "Top 8 Attractive Web Design Websites"
+            },
+            {
+                "h3": "How to build a blog with Next.js and MDX"
+            }
+        ],
+        "internal_links_count": 18,
+        "external_links_count": 12,
+        "image_count": 7,
+        "images_without_alt": 2,
+        "lazy_loaded_images_count": 4,
+        "javascript_usage_indicators": {
+            "inline_scripts": 18,
+            "external_scripts": 29,
+            "noscript_tag_present": false
+        },
+        "structured_data_scripts": [
+            {
+                "type": "JSON-LD",
+                "content_preview": "{'@context': 'https://schema.org', '@type': 'WebSite', 'name': 'Antoni Ferrandis - Technical SEO', 'description': 'I’m Toni, a Technical SEO Expert specialized in automation and ranking strategies tha..."
+            }
+        ],
+        "wai_aria_attributes_found": 22,
+        "mobile_friendly_meta_tags": true,
+        "sitemap_links": [
+            "https://honghong.me/sitemap.xml",
+            "https://antoniferrandis.com/sitemap.xml (Default check)"
+        ],
+        "robots_txt_status": 200,
+        "robots_txt_content": "User-Agent: *\nAllow: /\nAllow: /api/avatar/*\nDisallow: /api/\n\nHost: https://honghong.me\nSitemap: https://honghong.me/sitemap.xml\n",
+        "html_saved_original": "resultados\\antoniferrandis.com_original.html",
+        "html_saved_prettified": "resultados\\antoniferrandis.com_parsed_prettified.html"
+    },
+    {
+        "url": "https://antoniferrandis.com/blog",
+        "http_status": 200,
+        "final_url_after_redirects": "https://antoniferrandis.com/blog",
+        "title": "Blog | Antoni Ferrandis - Technical SEO",
+        "meta_description": "My personal website and blog where I share my thoughts on various topics including tutorials, notes, and personal experiences. As a full-stack engineer from Hong Kong, I started learning web development as a hobby in December 2020. I use Next.js for building websites, GitHub for code hosting, and Vercel for deployment. Explore my site to learn more about my Journey and discover some of the web development resources that have inspired me.",
+        "meta_robots": "index, follow",
+        "viewport": "width=device-width, initial-scale=1",
+        "canonical_url": "https://honghong.me/blog",
+        "hreflang_tags": [],
+        "h1_tags": [
+            "Blog"
+        ],
+        "h2_tags": [
+            "My personal website and blog where I share my thoughts on various topics including tutorials, notes, and personal experiences. As a full-stack engineer from Hong Kong, I started learning web development as a hobby in December 2020. I use Next.js for building websites, GitHub for code hosting, and Vercel for deployment. Explore my site to learn more about my Journey and discover some of the web development resources that have inspired me."
+        ],
+        "h3_h6_tags": [
+            {
+                "h3": "Top 8 Attractive Web Design Websites"
+            },
+            {
+                "h3": "How to build a blog with Next.js and MDX"
+            },
+            {
+                "h3": "PHP study notes"
+            }
+        ],
+        "internal_links_count": 15,
+        "external_links_count": 6,
+        "image_count": 5,
+        "images_without_alt": 2,
+        "lazy_loaded_images_count": 3,
+        "javascript_usage_indicators": {
+            "inline_scripts": 31,
+            "external_scripts": 29,
+            "noscript_tag_present": false
+        },
+        "structured_data_scripts": [
+            {
+                "type": "JSON-LD",
+                "content_preview": "{'@context': 'https://schema.org', '@type': 'Blog', '@id': 'https://honghong.me/blog', 'name': 'Blog', 'description': 'My personal website and blog where I share my thoughts on various topics includin..."
+            }
+        ],
+        "wai_aria_attributes_found": 13,
+        "mobile_friendly_meta_tags": true,
+        "sitemap_links": [
+            "https://honghong.me/sitemap.xml",
+            "https://antoniferrandis.com/sitemap.xml (Default check)"
+        ],
+        "robots_txt_status": 200,
+        "robots_txt_content": "User-Agent: *\nAllow: /\nAllow: /api/avatar/*\nDisallow: /api/\n\nHost: https://honghong.me\nSitemap: https://honghong.me/sitemap.xml\n",
+        "html_saved_original": "resultados\\antoniferrandis.com_blog_original.html",
+        "html_saved_prettified": "resultados\\antoniferrandis.com_blog_parsed_prettified.html"
+    },
+    {
+        "url": "https://antoniferrandis.com/projects",
+        "http_status": 200,
+        "final_url_after_redirects": "https://antoniferrandis.com/projects",
+        "title": "Projects | Antoni Ferrandis - Technical SEO",
+        "meta_description": "The list of my projects.",
+        "meta_robots": "index, follow",
+        "viewport": "width=device-width, initial-scale=1",
+        "canonical_url": "https://honghong.me/projects",
+        "hreflang_tags": [],
+        "h1_tags": [
+            "Projects"
+        ],
+        "h2_tags": [
+            "The list of my projects.",
+            "Let's Chat!"
+        ],
+        "h3_h6_tags": [],
+        "internal_links_count": 13,
+        "external_links_count": 6,
+        "image_count": 3,
+        "images_without_alt": 2,
+        "lazy_loaded_images_count": 1,
+        "javascript_usage_indicators": {
+            "inline_scripts": 21,
+            "external_scripts": 28,
+            "noscript_tag_present": false
+        },
+        "structured_data_scripts": [
+            {
+                "type": "JSON-LD",
+                "content_preview": "{'@context': 'https://schema.org', '@type': 'CollectionPage', '@id': 'https://honghong.me/projects', 'name': 'Projects', 'description': 'The list of my projects.', 'url': 'https://honghong.me/projects..."
+            }
+        ],
+        "wai_aria_attributes_found": 11,
+        "mobile_friendly_meta_tags": true,
+        "sitemap_links": [
+            "https://honghong.me/sitemap.xml",
+            "https://antoniferrandis.com/sitemap.xml (Default check)"
+        ],
+        "robots_txt_status": 200,
+        "robots_txt_content": "User-Agent: *\nAllow: /\nAllow: /api/avatar/*\nDisallow: /api/\n\nHost: https://honghong.me\nSitemap: https://honghong.me/sitemap.xml\n",
+        "html_saved_original": "resultados\\antoniferrandis.com_projects_original.html",
+        "html_saved_prettified": "resultados\\antoniferrandis.com_projects_parsed_prettified.html"
+    },
+    {
+        "url": "https://antoniferrandis.com/about",
+        "http_status": 200,
+        "final_url_after_redirects": "https://antoniferrandis.com/about",
+        "title": "About | Antoni Ferrandis - Technical SEO",
+        "meta_description": "👋 Hi there! I am Antoni Ferrandis, a technical SEO who loves web development.",
+        "meta_robots": "index, follow",
+        "viewport": "width=device-width, initial-scale=1",
+        "canonical_url": "https://honghong.me/about",
+        "hreflang_tags": [],
+        "h1_tags": [
+            "About"
+        ],
+        "h2_tags": [
+            "👋 Hi there! I am Antoni Ferrandis, a technical SEO who loves web development.",
+            "WHO AM I",
+            "About this site",
+            "Inspiration",
+            "Social links",
+            "Logo"
+        ],
+        "h3_h6_tags": [],
+        "internal_links_count": 17,
+        "external_links_count": 26,
+        "image_count": 2,
+        "images_without_alt": 2,
+        "lazy_loaded_images_count": 0,
+        "javascript_usage_indicators": {
+            "inline_scripts": 21,
+            "external_scripts": 35,
+            "noscript_tag_present": false
+        },
+        "structured_data_scripts": [
+            {
+                "type": "JSON-LD",
+                "content_preview": "{'@context': 'https://schema.org', '@type': 'AboutPage', 'name': 'About', 'description': '👋 Hi there! I am Antoni Ferrandis, a technical SEO who loves web development.', 'url': 'https://honghong.me/ab..."
+            }
+        ],
+        "wai_aria_attributes_found": 16,
+        "mobile_friendly_meta_tags": true,
+        "sitemap_links": [
+            "https://honghong.me/sitemap.xml",
+            "https://antoniferrandis.com/sitemap.xml (Default check)"
+        ],
+        "robots_txt_status": 200,
+        "robots_txt_content": "User-Agent: *\nAllow: /\nAllow: /api/avatar/*\nDisallow: /api/\n\nHost: https://honghong.me\nSitemap: https://honghong.me/sitemap.xml\n",
+        "html_saved_original": "resultados\\antoniferrandis.com_about_original.html",
+        "html_saved_prettified": "resultados\\antoniferrandis.com_about_parsed_prettified.html"
+    },
+    {
+        "url": "https://antoniferrandis.com/projects/letschat",
+        "http_status": 200,
+        "final_url_after_redirects": "https://antoniferrandis.com/projects/letschat",
+        "title": "Let's Chat! | Antoni Ferrandis - Technical SEO",
+        "meta_description": "Meet My Personal AI Assistant",
+        "meta_robots": "index, follow",
+        "viewport": "width=device-width, initial-scale=1",
+        "canonical_url": "https://honghong.me/projects/letschat",
+        "hreflang_tags": [],
+        "h1_tags": [
+            "Let's Chat!"
+        ],
+        "h2_tags": [
+            "Meet My Personal AI Assistant"
+        ],
+        "h3_h6_tags": [],
+        "internal_links_count": 12,
+        "external_links_count": 8,
+        "image_count": 3,
+        "images_without_alt": 2,
+        "lazy_loaded_images_count": 0,
+        "javascript_usage_indicators": {
+            "inline_scripts": 19,
+            "external_scripts": 34,
+            "noscript_tag_present": false
+        },
+        "structured_data_scripts": [
+            {
+                "type": "JSON-LD",
+                "content_preview": "{'@context': 'https://schema.org', '@type': 'SoftwareApplication', 'name': \"Let's Chat!\", 'description': 'Meet My Personal AI Assistant', 'url': 'https://honghong.me/projects/letschat', 'applicationCa..."
+            }
+        ],
+        "wai_aria_attributes_found": 13,
+        "mobile_friendly_meta_tags": true,
+        "sitemap_links": [
+            "https://honghong.me/sitemap.xml",
+            "https://antoniferrandis.com/sitemap.xml (Default check)"
+        ],
+        "robots_txt_status": 200,
+        "robots_txt_content": "User-Agent: *\nAllow: /\nAllow: /api/avatar/*\nDisallow: /api/\n\nHost: https://honghong.me\nSitemap: https://honghong.me/sitemap.xml\n",
+        "html_saved_original": "resultados\\antoniferrandis.com_projects_letschat_original.html",
+        "html_saved_prettified": "resultados\\antoniferrandis.com_projects_letschat_parsed_prettified.html"
+    },
+    {
+        "url": "https://antoniferrandis.com/blog/top-8-attractive-web-design-websites",
+        "http_status": 200,
+        "final_url_after_redirects": "https://antoniferrandis.com/blog/top-8-attractive-web-design-websites",
+        "title": "Top 8 Attractive Web Design Websites | Antoni Ferrandis - Technical SEO",
+        "meta_description": "Explore 8 outstanding web design websites that captivate and inspire. Elevate your design game with these top-notch platforms.",
+        "meta_robots": "index, follow",
+        "viewport": "width=device-width, initial-scale=1",
+        "canonical_url": "https://honghong.me/blog/top-8-attractive-web-design-websites",
+        "hreflang_tags": [],
+        "h1_tags": [
+            "Top 8 Attractive Web Design Websites"
+        ],
+        "h2_tags": [
+            "Preface",
+            "Raycast",
+            "Linear",
+            "Figma",
+            "Next.js",
+            "PlanetScale",
+            "Fig",
+            "Pipe",
+            "Framer",
+            "Conclusion"
+        ],
+        "h3_h6_tags": [],
+        "internal_links_count": 23,
+        "external_links_count": 16,
+        "image_count": 20,
+        "images_without_alt": 2,
+        "lazy_loaded_images_count": 17,
+        "javascript_usage_indicators": {
+            "inline_scripts": 29,
+            "external_scripts": 36,
+            "noscript_tag_present": false
+        },
+        "structured_data_scripts": [
+            {
+                "type": "JSON-LD",
+                "content_preview": "{'@context': 'https://schema.org', '@type': 'Article', 'headline': 'Top 8 Attractive Web Design Websites', 'name': 'Top 8 Attractive Web Design Websites', 'description': 'Explore 8 outstanding web des..."
+            }
+        ],
+        "wai_aria_attributes_found": 51,
+        "mobile_friendly_meta_tags": true,
+        "sitemap_links": [
+            "https://honghong.me/sitemap.xml",
+            "https://antoniferrandis.com/sitemap.xml (Default check)"
+        ],
+        "robots_txt_status": 200,
+        "robots_txt_content": "User-Agent: *\nAllow: /\nAllow: /api/avatar/*\nDisallow: /api/\n\nHost: https://honghong.me\nSitemap: https://honghong.me/sitemap.xml\n",
+        "html_saved_original": "resultados\\antoniferrandis.com_blog_top-8-attractive-web-design-website_original.html",
+        "html_saved_prettified": "resultados\\antoniferrandis.com_blog_top-8-attractive-web-design-website_parsed_prettified.html"
+    },
+    {
+        "url": "https://antoniferrandis.com/blog/how-to-build-a-blog-with-nextjs-and-mdx",
+        "http_status": 200,
+        "final_url_after_redirects": "https://antoniferrandis.com/blog/how-to-build-a-blog-with-nextjs-and-mdx",
+        "title": "How to build a blog with Next.js and MDX | Antoni Ferrandis - Technical SEO",
+        "meta_description": "Using Next.js to build a blog is very easy!",
+        "meta_robots": "index, follow",
+        "viewport": "width=device-width, initial-scale=1",
+        "canonical_url": "https://honghong.me/blog/how-to-build-a-blog-with-nextjs-and-mdx",
+        "hreflang_tags": [],
+        "h1_tags": [
+            "How to build a blog with Next.js and MDX"
+        ],
+        "h2_tags": [
+            "Preface",
+            "Demo",
+            "How to create a blog",
+            "Useful links"
+        ],
+        "h3_h6_tags": [
+            {
+                "h3": "How to handle Markdown files"
+            },
+            {
+                "h3": "Formatting Date"
+            },
+            {
+                "h3": "Home page"
+            },
+            {
+                "h3": "Article Page"
+            }
+        ],
+        "internal_links_count": 20,
+        "external_links_count": 18,
+        "image_count": 4,
+        "images_without_alt": 2,
+        "lazy_loaded_images_count": 1,
+        "javascript_usage_indicators": {
+            "inline_scripts": 27,
+            "external_scripts": 36,
+            "noscript_tag_present": false
+        },
+        "structured_data_scripts": [
+            {
+                "type": "JSON-LD",
+                "content_preview": "{'@context': 'https://schema.org', '@type': 'Article', 'headline': 'How to build a blog with Next.js and MDX', 'name': 'How to build a blog with Next.js and MDX', 'description': 'Using Next.js to buil..."
+            }
+        ],
+        "wai_aria_attributes_found": 91,
+        "mobile_friendly_meta_tags": true,
+        "sitemap_links": [
+            "https://honghong.me/sitemap.xml",
+            "https://antoniferrandis.com/sitemap.xml (Default check)"
+        ],
+        "robots_txt_status": 200,
+        "robots_txt_content": "User-Agent: *\nAllow: /\nAllow: /api/avatar/*\nDisallow: /api/\n\nHost: https://honghong.me\nSitemap: https://honghong.me/sitemap.xml\n",
+        "html_saved_original": "resultados\\antoniferrandis.com_blog_how-to-build-a-blog-with-nextjs-and_original.html",
+        "html_saved_prettified": "resultados\\antoniferrandis.com_blog_how-to-build-a-blog-with-nextjs-and_parsed_prettified.html"
+    },
+    {
+        "url": "https://antoniferrandis.com/dashboard",
+        "http_status": 200,
+        "final_url_after_redirects": "https://antoniferrandis.com/dashboard",
+        "title": "Dashboard | Antoni Ferrandis - Technical SEO",
+        "meta_description": "This is my personal dashboard, built with Next.js API routes deployed as serverless functions. I use this dashboard to track various metrics across platforms like YouTube, GitHub, and more.",
+        "meta_robots": "index, follow",
+        "viewport": "width=device-width, initial-scale=1",
+        "canonical_url": "https://honghong.me/dashboard",
+        "hreflang_tags": [],
+        "h1_tags": [
+            "Dashboard"
+        ],
+        "h2_tags": [
+            "This is my personal dashboard, built with Next.js API routes deployed as serverless functions. I use this dashboard to track various metrics across platforms like YouTube, GitHub, and more."
+        ],
+        "h3_h6_tags": [],
+        "internal_links_count": 12,
+        "external_links_count": 6,
+        "image_count": 2,
+        "images_without_alt": 2,
+        "lazy_loaded_images_count": 0,
+        "javascript_usage_indicators": {
+            "inline_scripts": 17,
+            "external_scripts": 29,
+            "noscript_tag_present": false
+        },
+        "structured_data_scripts": [
+            {
+                "type": "JSON-LD",
+                "content_preview": "{'@context': 'https://schema.org', '@type': 'WebPage', 'name': 'Dashboard', 'description': 'This is my personal dashboard, built with Next.js API routes deployed as serverless functions. I use this da..."
+            }
+        ],
+        "wai_aria_attributes_found": 11,
+        "mobile_friendly_meta_tags": true,
+        "sitemap_links": [
+            "https://honghong.me/sitemap.xml",
+            "https://antoniferrandis.com/sitemap.xml (Default check)"
+        ],
+        "robots_txt_status": 200,
+        "robots_txt_content": "User-Agent: *\nAllow: /\nAllow: /api/avatar/*\nDisallow: /api/\n\nHost: https://honghong.me\nSitemap: https://honghong.me/sitemap.xml\n",
+        "html_saved_original": "resultados\\antoniferrandis.com_dashboard_original.html",
+        "html_saved_prettified": "resultados\\antoniferrandis.com_dashboard_parsed_prettified.html"
+    },
+    {
+        "url": "https://antoniferrandis.com/uses",
+        "http_status": 200,
+        "final_url_after_redirects": "https://antoniferrandis.com/uses",
+        "title": "Uses | Antoni Ferrandis - Technical SEO",
+        "meta_description": "This is the equipment I currently use for gaming, programming, making videos, and every day.",
+        "meta_robots": "index, follow",
+        "viewport": "width=device-width, initial-scale=1",
+        "canonical_url": "https://honghong.me/uses",
+        "hreflang_tags": [],
+        "h1_tags": [
+            "Uses"
+        ],
+        "h2_tags": [
+            "This is the equipment I currently use for gaming, programming, making videos, and every day.",
+            "Laptop",
+            "Accessories",
+            "Gaming PC - Hardware",
+            "Coding",
+            "Software"
+        ],
+        "h3_h6_tags": [],
+        "internal_links_count": 17,
+        "external_links_count": 45,
+        "image_count": 42,
+        "images_without_alt": 2,
+        "lazy_loaded_images_count": 39,
+        "javascript_usage_indicators": {
+            "inline_scripts": 21,
+            "external_scripts": 35,
+            "noscript_tag_present": false
+        },
+        "structured_data_scripts": [
+            {
+                "type": "JSON-LD",
+                "content_preview": "{'@context': 'https://schema.org', '@type': 'WebPage', 'name': 'Uses', 'description': 'This is the equipment I currently use for gaming, programming, making videos, and every day.', 'url': 'https://ho..."
+            }
+        ],
+        "wai_aria_attributes_found": 17,
+        "mobile_friendly_meta_tags": true,
+        "sitemap_links": [
+            "https://honghong.me/sitemap.xml",
+            "https://antoniferrandis.com/sitemap.xml (Default check)"
+        ],
+        "robots_txt_status": 200,
+        "robots_txt_content": "User-Agent: *\nAllow: /\nAllow: /api/avatar/*\nDisallow: /api/\n\nHost: https://honghong.me\nSitemap: https://honghong.me/sitemap.xml\n",
+        "html_saved_original": "resultados\\antoniferrandis.com_uses_original.html",
+        "html_saved_prettified": "resultados\\antoniferrandis.com_uses_parsed_prettified.html"
+    },
+    {
+        "url": "https://antoniferrandis.com/blog/php",
+        "http_status": 200,
+        "final_url_after_redirects": "https://antoniferrandis.com/blog/php",
+        "title": "PHP study notes | Antoni Ferrandis - Technical SEO",
+        "meta_description": "Basics about PHP such as comments, Echo, variables, arithmetic operators",
+        "meta_robots": "index, follow",
+        "viewport": "width=device-width, initial-scale=1",
+        "canonical_url": "https://honghong.me/blog/php",
+        "hreflang_tags": [],
+        "h1_tags": [
+            "PHP study notes"
+        ],
+        "h2_tags": [
+            "Introduction of PHP",
+            "Usage",
+            "Precautions",
+            "PHP comments",
+            "Echo",
+            "Variable",
+            "Variable Naming Tips",
+            "String operator",
+            "Arithmetic operator",
+            "References"
+        ],
+        "h3_h6_tags": [
+            {
+                "h3": "Camel case"
+            },
+            {
+                "h3": "Snake case"
+            }
+        ],
+        "internal_links_count": 24,
+        "external_links_count": 12,
+        "image_count": 4,
+        "images_without_alt": 2,
+        "lazy_loaded_images_count": 1,
+        "javascript_usage_indicators": {
+            "inline_scripts": 29,
+            "external_scripts": 36,
+            "noscript_tag_present": false
+        },
+        "structured_data_scripts": [
+            {
+                "type": "JSON-LD",
+                "content_preview": "{'@context': 'https://schema.org', '@type': 'Article', 'headline': 'PHP study notes', 'name': 'PHP study notes', 'description': 'Basics about PHP such as comments, Echo, variables, arithmetic operator..."
+            }
+        ],
+        "wai_aria_attributes_found": 59,
+        "mobile_friendly_meta_tags": true,
+        "sitemap_links": [
+            "https://honghong.me/sitemap.xml",
+            "https://antoniferrandis.com/sitemap.xml (Default check)"
+        ],
+        "robots_txt_status": 200,
+        "robots_txt_content": "User-Agent: *\nAllow: /\nAllow: /api/avatar/*\nDisallow: /api/\n\nHost: https://honghong.me\nSitemap: https://honghong.me/sitemap.xml\n",
+        "html_saved_original": "resultados\\antoniferrandis.com_blog_php_original.html",
+        "html_saved_prettified": "resultados\\antoniferrandis.com_blog_php_parsed_prettified.html"
+    }
+]

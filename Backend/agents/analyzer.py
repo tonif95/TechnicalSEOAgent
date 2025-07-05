@@ -1,16 +1,23 @@
 import os
 import json
-from agents import Agent, Runner
+from agents import Agent, Runner # Asume que 'agents' está disponible en tu entorno
 from dotenv import load_dotenv
 
 # --- Constantes ---
 RESULTS_DIR = "resultados"
 JSON_FILE_NAME = "all_analysis_results.json"
-REPORTS_DIR = "informes" # Nueva constante para la carpeta de informes
 load_dotenv(dotenv_path="../.env") # Asegúrate de que la ruta a tu .env sea correcta
 
-# 1. Cargar el archivo JSON
+# Función para cargar el archivo JSON
 def load_analysis_results():
+    """
+    Carga los resultados del análisis SEO desde un archivo JSON.
+
+    Returns:
+        dict: Un diccionario con los datos del análisis.
+    Raises:
+        FileNotFoundError: Si no se encuentra el archivo JSON.
+    """
     json_filepath = os.path.join(RESULTS_DIR, JSON_FILE_NAME)
     if not os.path.exists(json_filepath):
         raise FileNotFoundError(f"No se encontró el archivo '{json_filepath}'")
@@ -18,12 +25,17 @@ def load_analysis_results():
     with open(json_filepath, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-# 2. Función principal para orquestar ambos agentes
+# Función principal para orquestar la generación del informe SEO
 def generate_technical_seo_report():
+    """
+    Orquesta la ejecución del agente analizador para generar un informe SEO técnico.
+
+    Returns:
+        str: El contenido del informe SEO técnico generado.
+    """
     print("✅ Iniciando el proceso de auditoría y estrategia SEO...")
 
     # --- AGENTE ANALIZADOR (Technical SEO Expert Agent) ---
-    # Este agente identifica problemas y genera el informe inicial
     print("\n--- Paso 1: Ejecutando Agente Analizador (Technical SEO Expert Agent) ---")
 
     instructions_analyzer = (
@@ -40,7 +52,6 @@ def generate_technical_seo_report():
 
     loaded_results = load_analysis_results()
 
-    # El prompt para el agente analizador, incluyendo los datos JSON
     prompt_analyzer = f"""
     Eres un experto en SEO técnico con mucha experiencia en auditorías completas de sitios web.
 
@@ -65,23 +76,22 @@ def generate_technical_seo_report():
     print("🚀 Ejecutando Agente Analizador para generar el informe...")
     analyzer_result = Runner.run_sync(seo_analyzer_agent, prompt_analyzer)
     
-    # Captura la salida completa del agente analizador en una variable
     analysis_report_content = analyzer_result.final_output
     
-    # --- NUEVA LÓGICA: GUARDAR EL INFORME EN UN ARCHIVO TXT ---
-    # Asegúrate de que la carpeta 'informes' exista
-    os.makedirs(REPORTS_DIR, exist_ok=True)
-    
-    # Define la ruta del archivo de informe
-    report_file_path = os.path.join(REPORTS_DIR, "informe_seo_tecnico_analizador.txt")
-    
-    # Guarda el contenido en el archivo
-    with open(report_file_path, 'w', encoding='utf-8') as f:
-        f.write(analysis_report_content)
-    
-    print(f"\n📋 Informe SEO técnico generado por el Analizador y guardado en: {report_file_path}")
+    print("\n📋 Informe SEO técnico generado por el Analizador y almacenado en la variable 'analysis_report_content'.")
     print("--------------------------------------------------")
+    
 
-# Ejecutar directamente
+    return analysis_report_content
+
+# Este bloque solo se ejecuta si el script se corre directamente, no cuando se importa
 if __name__ == "__main__":
-    generate_technical_seo_report()
+    try:
+        report_content = generate_technical_seo_report()
+        print("\n--- Contenido del informe (primeras 500 caracteres) ---")
+        print(report_content[:500] + "..." if len(report_content) > 500 else report_content)
+        print("\n--- Fin del contenido del informe ---")
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+    except Exception as e:
+        print(f"Ocurrió un error inesperado: {e}")
