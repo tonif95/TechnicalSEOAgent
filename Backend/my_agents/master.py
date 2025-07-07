@@ -10,6 +10,10 @@ from dotenv import load_dotenv
 from multiprocessing import Process, Queue
 import time
 
+# --- ¡NUEVA IMPORTACIÓN NECESARIA PARA CORS! ---
+from fastapi.middleware.cors import CORSMiddleware
+# --- FIN NUEVA IMPORTACIÓN ---
+
 # Configuración de PYTHONPATH para asegurar que se puedan importar módulos locales
 # project_root_dir apunta a la carpeta 'Agenteseo'
 project_root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -48,6 +52,33 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# --- ¡INICIO DEL BLOQUE DE CÓDIGO CORS QUE DEBES AÑADIR AQUÍ! ---
+
+# Obtén la URL de tu frontend desplegado en Render.com
+# 1. Ve a tu dashboard de Render.
+# 2. Ve a tu servicio de frontend (se llama 'TechnicalSEOAgent-1' según tu captura).
+# 3. Copia su "External URL" (será algo como: https://technicalseoagent-1.onrender.com).
+#
+# Es MUY IMPORTANTE que esta URL sea la correcta.
+FRONTEND_RENDER_URL = "https://technicalseoagent-1.onrender.com" # <--- ¡REEMPLAZA CON LA URL REAL DE TU FRONTEND!
+
+origins = [
+    "http://localhost",
+    "http://localhost:5173",  # Para desarrollo local de Vite
+    "http://127.0.0.1:5173",  # Para desarrollo local de Vite
+    FRONTEND_RENDER_URL,      # La URL de tu frontend desplegado en Render
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+# --- ¡FIN DEL BLOQUE DE CÓDIGO CORS! ---
+
 
 # Modelo para la URL de rastreo
 class CrawlRequest(BaseModel):
