@@ -1,6 +1,5 @@
 import os
 from agents import Agent, Runner
-from dotenv import load_dotenv
 import sys
 
 # Añade el directorio padre al sys.path para poder importar seo_utils
@@ -20,8 +19,6 @@ except ImportError as e:
     sys.exit(1)
 
 
-# Carga las variables de entorno para la clave de API de OpenAI
-load_dotenv(dotenv_path="../.env") 
 
 class SEOStrategist:
     """
