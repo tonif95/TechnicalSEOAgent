@@ -1,4 +1,2 @@
 *.env
 .Backend/venv/
-Backend\agents\informes
-Backend\agents\resultados
