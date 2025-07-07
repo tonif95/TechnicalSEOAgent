@@ -10,24 +10,32 @@ from dotenv import load_dotenv
 from multiprocessing import Process, Queue
 import time
 
-# --- ¡NUEVA IMPORTACIÓN NECESARIA PARA CORS! ---
+# --- IMPORTACIONES ADICIONALES PARA DB Y CORS ---
 from fastapi.middleware.cors import CORSMiddleware
-# --- FIN NUEVA IMPORTACIÓN ---
+from sqlalchemy.orm import Session # Para la dependencia de la sesión de DB
+from sqlalchemy import text # Para ejecutar SQL crudo en clear_database
+# --- FIN IMPORTACIONES ADICIONALES ---
 
 # Configuración de PYTHONPATH para asegurar que se puedan importar módulos locales
-# project_root_dir apunta a la carpeta 'Agenteseo'
 project_root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root_dir not in sys.path:
     sys.path.insert(0, project_root_dir)
 
 # Importaciones de módulos de la aplicación
-# La función load_analysis_results_from_db se necesita para el endpoint /results/
-from Backend.my_agents.crawler import setup_database, get_html_and_parse, analyze_html_content, save_to_database, DB_NAME as CRAWLER_DB_NAME
-from Backend.my_agents.analyzer import _generate_report_in_process, load_analysis_results_from_db
+# Ahora importamos SessionLocal y CrawledPage desde crawler para interactuar con la DB
+from Backend.my_agents.crawler import setup_database, get_html_and_parse, analyze_html_content, save_to_database, SessionLocal, CrawledPage # Importar SessionLocal y CrawledPage
+from Backend.my_agents.analyzer import _generate_report_in_process, load_analysis_results_from_db # load_analysis_results_from_db también necesitará ser actualizado
 
 # Cargar variables de entorno para el proceso principal (FastAPI)
-# La ruta aquí es relativa a master.py (Backend/my_agents/) al archivo .env en Backend/
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
+
+# --- Dependencia para obtener una sesión de base de datos ---
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 # Lifespan Event Handler
 @contextlib.asynccontextmanager
@@ -38,10 +46,13 @@ async def lifespan(app: FastAPI):
     """
     print("Iniciando la aplicación FastAPI...")
     try:
-        setup_database()
-        print(f"Base de datos {CRAWLER_DB_NAME} verificada.")
+        setup_database() # setup_database ahora usa el motor de SQLAlchemy
+        print("Base de datos PostgreSQL verificada.")
     except Exception as e:
         print(f"ERROR: No se pudo inicializar la base de datos: {e}")
+        # Es crucial que la aplicación no inicie si la DB no está lista
+        raise
+
     yield
     print("Cerrando la aplicación FastAPI...")
 
@@ -53,12 +64,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# --- ¡INICIO DEL BLOQUE DE CÓDIGO CORS QUE DEBES AÑADIR AQUÍ! ---
-
+# --- CONFIGURACIÓN DE CORS ---
 # Obtén la URL de tu frontend desplegado en Render.com
 # 1. Ve a tu dashboard de Render.
-# 2. Ve a tu servicio de frontend (se llama 'TechnicalSEOAgent-1' según tu captura).
-# 3. Copia su "External URL" (será algo como: https://technicalseoagent-1.onrender.com).
+# 2. Ve a tu servicio de frontend (ej. 'TechnicalSEOAgent-1').
+# 3. Copia su "External URL" (ej. https://technicalseoagent-1.onrender.com).
 #
 # Es MUY IMPORTANTE que esta URL sea la correcta.
 FRONTEND_RENDER_URL = "https://technicalseoagent-1.onrender.com" # <--- ¡REEMPLAZA CON LA URL REAL DE TU FRONTEND!
@@ -77,7 +87,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# --- ¡FIN DEL BLOQUE DE CÓDIGO CORS! ---
+# --- FIN CONFIGURACIÓN DE CORS ---
 
 
 # Modelo para la URL de rastreo
@@ -119,10 +129,6 @@ async def run_crawl_process(target_url: str, max_pages: int):
             
             print(f"CRAWLER - DEBUG: Intentando procesar URL: {current_url}. Páginas procesadas hasta ahora: {len(processed_urls)}/{max_pages}. URLs restantes en cola: {len(urls_to_crawl)}")
 
-            # get_html_and_parse añade la URL al conjunto `processed_urls`
-            # antes de intentar obtener el contenido.
-            # Esto ayuda a manejar URLs que fallan en la solicitud sin entrar en un bucle infinito
-            # y asegura que se cuenten para el límite `max_pages`.
             if current_url in processed_urls:
                 print(f"CRAWLER - INFO: Saltando URL ya procesada: {current_url}")
                 continue
@@ -132,7 +138,7 @@ async def run_crawl_process(target_url: str, max_pages: int):
                 break 
 
             soup, original_html_content, prettified_html_content, found_links = \
-                get_html_and_parse(current_url, base_domain, processed_urls, max_pages)
+                get_html_and_parse(current_url, base_domain) # Eliminados processed_urls y MAX_PAGES
 
             if soup:
                 print(f"CRAWLER - DEBUG: 'soup' obtenido para {current_url}. Contiene HTML parseado.")
@@ -165,13 +171,23 @@ async def run_crawl_process(target_url: str, max_pages: int):
 
 # Endpoint para obtener todos los resultados de análisis
 @app.get("/results/", summary="Obtener todos los resultados de análisis de la base de datos", response_description="Lista de resultados de análisis")
-async def get_all_analysis_results():
+# --- CAMBIO AQUÍ: Usar get_db para obtener la sesión ---
+async def get_all_analysis_results(db: Session = Depends(get_db)):
     """
     Recupera y devuelve todos los resultados de análisis guardados en la base de datos.
     """
     try:
-        results = load_analysis_results_from_db()
-        return results
+        # Ahora load_analysis_results_from_db necesitará la sesión de DB
+        # O podemos implementar la lógica directamente aquí
+        results = db.query(CrawledPage).all()
+        # Convertir objetos SQLAlchemy a diccionarios para la respuesta JSON
+        return [
+            {
+                "url": page.url,
+                "timestamp": page.timestamp.isoformat() if page.timestamp else None,
+                "analysis_results": page.analysis_results
+            } for page in results
+        ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al cargar resultados de la base de datos: {e}")
 
@@ -224,29 +240,27 @@ async def generate_seo_report():
 
 # Endpoint para limpiar la base de datos
 @app.delete("/clear-database/", summary="Limpiar la base de datos", response_description="Mensaje de confirmación de limpieza")
-async def clear_database():
+# --- CAMBIO AQUÍ: Usar get_db para obtener la sesión y SQLAlchemy para borrar ---
+async def clear_database(db: Session = Depends(get_db)):
     """
     Elimina todos los datos de la tabla 'crawled_pages' en la base de datos.
     """
-    import sqlite3 # Importación local para este endpoint
-    conn = None
     try:
-        conn = sqlite3.connect(CRAWLER_DB_NAME)
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM crawled_pages")
-        conn.commit()
+        # Ejecutar un DELETE FROM en la tabla
+        db.execute(text("DELETE FROM crawled_pages"))
+        db.commit()
         return {"message": "Base de datos limpiada exitosamente."}
-    except sqlite3.Error as e:
+    except Exception as e:
+        db.rollback() # Hacer rollback en caso de error
         raise HTTPException(status_code=500, detail=f"Error al limpiar la base de datos: {e}")
-    finally:
-        if conn:
-            conn.close()
 
-# Bloque de ejecución principal para Uvicorn
+# Bloque de ejecución principal para Uvicorn (solo para desarrollo local)
 if __name__ == "__main__":
-    # Importante: Protege el bloque de multiprocesamiento para que funcione correctamente
-    # en diferentes sistemas operativos (especialmente Windows).
     from multiprocessing import freeze_support
     freeze_support() 
-
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Para ejecutar localmente con PostgreSQL, necesitarías configurar DATABASE_URL
+    # en tu entorno local (ej. con un .env o directamente en la terminal)
+    # y luego ejecutar este archivo.
+    # uvicorn.run(app, host="0.0.0.0", port=8000)
+    print("Para ejecutar localmente, asegúrate de que DATABASE_URL esté configurada.")
+    print("Usa 'uvicorn Backend.my_agents.master:app --reload' y configura DATABASE_URL en tu entorno.")

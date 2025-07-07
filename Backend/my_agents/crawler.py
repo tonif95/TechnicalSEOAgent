@@ -6,61 +6,105 @@ from urllib.parse import urlparse, urljoin
 import json
 import time
 import sys
-import sqlite3 # Importar la librería de SQLite
+# import sqlite3 # Ya no necesitamos sqlite3 directamente
 
-# Nombre de la base de datos SQLite
-DB_NAME = "crawler_results.db"
+# --- NUEVAS IMPORTACIONES PARA SQLAlchemy y PostgreSQL ---
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, JSON
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import func # Para CURRENT_TIMESTAMP
+# --- FIN NUEVAS IMPORTACIONES ---
+
+# Configuración de PYTHONPATH para asegurar que se puedan importar módulos locales
+project_root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if project_root_dir not in sys.path:
+    sys.path.insert(0, project_root_dir)
+
+# Nombre de la base de datos SQLite (ya no se usa directamente, pero se mantiene la referencia)
+# DB_NAME = "crawler_results.db" # Esta constante ya no es relevante para PostgreSQL
+
+# --- Configuración de SQLAlchemy ---
+# La URL de la base de datos se obtendrá de una variable de entorno en master.py
+DATABASE_URL = os.getenv("DATABASE_URL") # Esto se leerá desde el entorno de Render
+
+# Ajuste para Render: si la URL de la DB empieza con 'postgres://', cámbiala a 'postgresql://'
+# Esto es un requisito común de SQLAlchemy para URLs de Render/Heroku
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# Crear el motor de la base de datos
+engine = create_engine(DATABASE_URL)
+
+# Crear una clase base para los modelos declarativos
+Base = declarative_base()
+
+# Definir el modelo de la tabla crawled_pages
+class CrawledPage(Base):
+    __tablename__ = 'crawled_pages'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    url = Column(String, unique=True, nullable=False)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+    original_html = Column(Text)
+    prettified_html = Column(Text)
+    analysis_results = Column(JSON) # JSON type para PostgreSQL
+
+    def __repr__(self):
+        return f"<CrawledPage(url='{self.url}')>"
+
+# Crear una sesión de base de datos
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def setup_database():
-    """Configura la base de datos SQLite y crea la tabla si no existe."""
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS crawled_pages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            url TEXT UNIQUE NOT NULL,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            original_html TEXT,
-            prettified_html TEXT,
-            analysis_results JSON
-        )
-    ''')
-    conn.commit()
-    conn.close()
-    print(f"Base de datos '{DB_NAME}' configurada y tabla 'crawled_pages' creada (si no existía).")
+    """Configura la base de datos PostgreSQL y crea la tabla si no existe."""
+    print("Intentando configurar la base de datos PostgreSQL...")
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("Tabla 'crawled_pages' verificada/creada en PostgreSQL.")
+    except Exception as e:
+        print(f"ERROR: No se pudo conectar o crear la tabla en PostgreSQL: {e}")
+        raise # Propagar el error para que el lifespan lo capture
 
 def save_to_database(url, original_html, prettified_html, analysis_results):
     """Guarda el HTML original, el HTML prettificado y los resultados del análisis en la base de datos."""
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
+    db = SessionLocal()
     try:
-        # Convertir el diccionario de resultados a JSON string para almacenarlo
-        analysis_results_json = json.dumps(analysis_results, ensure_ascii=False)
-        cursor.execute('''
-            INSERT OR REPLACE INTO crawled_pages (url, original_html, prettified_html, analysis_results)
-            VALUES (?, ?, ?, ?)
-        ''', (url, original_html, prettified_html, analysis_results_json))
-        conn.commit()
-        print(f"Datos de {url} guardados exitosamente en la base de datos.")
-    except sqlite3.Error as e:
-        print(f"Error al guardar los datos de {url} en la base de datos: {e}")
-    finally:
-        conn.close()
+        # Buscar si la URL ya existe
+        existing_page = db.query(CrawledPage).filter(CrawledPage.url == url).first()
 
-def get_html_and_parse(url, base_domain, processed_urls, max_pages_to_crawl):
+        if existing_page:
+            # Actualizar página existente
+            existing_page.timestamp = func.now()
+            existing_page.original_html = original_html
+            existing_page.prettified_html = prettified_html
+            existing_page.analysis_results = analysis_results
+            print(f"Datos de {url} actualizados exitosamente en la base de datos.")
+        else:
+            # Crear nueva página
+            new_page = CrawledPage(
+                url=url,
+                original_html=original_html,
+                prettified_html=prettified_html,
+                analysis_results=analysis_results
+            )
+            db.add(new_page)
+            print(f"Datos de {url} guardados exitosamente en la base de datos.")
+        
+        db.commit()
+        db.refresh(existing_page if existing_page else new_page) # Refrescar para obtener el estado actual
+    except Exception as e:
+        db.rollback()
+        print(f"Error al guardar los datos de {url} en la base de datos: {e}")
+        raise # Re-lanzar la excepción para que el llamador pueda manejarla
+    finally:
+        db.close()
+
+def get_html_and_parse(url, base_domain): # Eliminados processed_urls y max_pages_to_crawl
     """
     Dada una URL, obtiene el código HTML y lo parsea usando BeautifulSoup.
     Retorna el objeto BeautifulSoup, el HTML original, el HTML prettificado y una lista de enlaces internos.
     """
-    if url in processed_urls:
-        print(f"Saltando URL ya procesada: {url}")
-        return None, None, None, []
-    if len(processed_urls) >= max_pages_to_crawl:
-        print(f"Alcanzado el límite de {max_pages_to_crawl} páginas para rastrear.")
-        return None, None, None, []
-
-    processed_urls.add(url) # Añadir la URL al conjunto de procesadas
-
+    # Las comprobaciones de processed_urls y max_pages_to_crawl se manejan en main.py
     try:
         print(f"\nIntentando obtener contenido de: {url}")
         response = requests.get(url, timeout=10)
@@ -247,8 +291,10 @@ def analyze_html_content(url, parsed_soup_object):
     return analysis_results
 
 
+# El bloque if __name__ == "__main__": no es relevante para la ejecución de FastAPI en Render
+# ya que Uvicorn lo ejecuta directamente. Solo es para pruebas locales de crawler.py
 if __name__ == "__main__":
-    setup_database() # Configurar la base de datos al inicio
+    # setup_database() # Esto se llama desde lifespan en master.py
 
     if len(sys.argv) > 1:
         target_url = sys.argv[1]
@@ -267,15 +313,19 @@ if __name__ == "__main__":
     while urls_to_crawl and len(processed_urls) < MAX_PAGES:
         current_url = urls_to_crawl.pop(0)
 
+        # Aquí necesitas pasar la sesión de la base de datos si quieres interactuar
+        # con ella en este bloque de prueba.
+        # Para el propósito de este ejemplo, asumimos que save_to_database
+        # maneja su propia sesión.
         soup, original_html_content, prettified_html_content, found_links = \
-            get_html_and_parse(current_url, base_domain, processed_urls, MAX_PAGES)
+            get_html_and_parse(current_url, base_domain) # Eliminados processed_urls y MAX_PAGES
         
         if soup:
             analysis_results = analyze_html_content(current_url, soup)
             if analysis_results:
                 # Guardar en la base de datos
-                save_to_database(current_url, original_html_content, prettified_html_content, analysis_results)
-                print(f"Análisis y guardado en DB completado para: {current_url}")
+                # save_to_database(current_url, original_html_content, prettified_html_content, analysis_results)
+                print(f"Análisis y guardado en DB completado para: {current_url} (simulado para pruebas locales)")
 
             for link in found_links:
                 if link not in processed_urls and urlparse(link).netloc == base_domain:
@@ -286,5 +336,5 @@ if __name__ == "__main__":
 
         time.sleep(1)
 
-    print("\nRastreo completado. Todos los resultados han sido guardados en la base de datos.")
-    print(f"Puedes inspeccionar la base de datos '{DB_NAME}' usando una herramienta de SQLite.")
+    print("\nRastreo completado. Todos los resultados han sido guardados en la base de datos (simulado para pruebas locales).")
+    # print(f"Puedes inspeccionar la base de datos '{DB_NAME}' usando una herramienta de SQLite.")
