@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
-// import ApiKeyModal from './components/ApiKeyModal'; // Eliminado: el modal se integrará directamente
 import ControlPanel from './components/ControlPanel';
 import ResultsSection from './components/ResultsSection';
 import ReportModal from './components/ReportModal';
@@ -10,7 +9,7 @@ import Toast from './components/Toast';
 interface SEOResult {
   // Asumiendo que SEOResult tiene algunas propiedades, añádelas aquí
   // Por ejemplo: url: string; title: string; description: string;
-  [key: string]: any; // Marcador de posición si la estructura real es desconocina
+  [key: string]: any; // Marcador de posición si la estructura real es desconocida
 }
 
 interface ApiResponse<T> {
@@ -66,6 +65,13 @@ function App() {
   const [apiKey, setApiKey] = useState<string>(''); // Nuevo estado para almacenar la clave API
   const [apiKeyInput, setApiKeyInput] = useState<string>(''); // Estado para el input del modal de la clave API
 
+  // Obtener la URL base de la API desde las variables de entorno de Vite
+  // Asegúrate de que VITE_APP_API_URL esté configurada en Render para tu servicio de frontend
+  // con la URL de tu backend (ej. https://technicalseoagent.onrender.com)
+  //
+  // ¡ACTUALIZADO AQUÍ CON LA URL PROPORCIONADA!
+  const API_BASE_URL = import.meta.env.VITE_APP_API_URL || "https://technicalseoagentbackend.onrender.com";
+
   // Cargar la clave API desde localStorage al iniciar
   useEffect(() => {
     const storedApiKey = localStorage.getItem('openai_api_key');
@@ -99,7 +105,8 @@ function App() {
 
     setIsGeneratingReport(true);
     try {
-      const response = await fetch('/generate-report/', {
+      // *** CAMBIO AQUÍ: Usar API_BASE_URL ***
+      const response = await fetch(`${API_BASE_URL}/generate-report/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -120,7 +127,8 @@ function App() {
 
       // --- NUEVA FUNCIONALIDAD: Eliminar datos de la base de datos después de generar el informe ---
       try {
-        const clearResponse = await fetch('/clear-database/', {
+        // *** CAMBIO AQUÍ: Usar API_BASE_URL ***
+        const clearResponse = await fetch(`${API_BASE_URL}/clear-database/`, {
           method: 'DELETE',
         });
 
@@ -144,7 +152,7 @@ function App() {
     } finally {
       setIsGeneratingReport(false);
     }
-  }, [showToast, apiKey]);
+  }, [showToast, apiKey, API_BASE_URL]); // Añadir API_BASE_URL a las dependencias
 
   // Función para iniciar el rastreo y luego generar el informe
   const handleStartCrawl = useCallback(async (url: string, maxPages: number) => {
@@ -156,7 +164,8 @@ function App() {
 
     setIsLoading(true);
     try {
-      const response = await fetch('/crawl/', {
+      // *** CAMBIO AQUÍ: Usar API_BASE_URL ***
+      const response = await fetch(`${API_BASE_URL}/crawl/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -181,12 +190,13 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast, handleGenerateReport, apiKey]); // Añadir apiKey a las dependencias
+  }, [showToast, handleGenerateReport, apiKey, API_BASE_URL]); // Añadir API_BASE_URL a las dependencias
 
   // Función para borrar todos los datos de análisis
   const handleClearData = useCallback(async () => {
     try {
-      const response = await fetch('/clear-database/', {
+      // *** CAMBIO AQUÍ: Usar API_BASE_URL ***
+      const response = await fetch(`${API_BASE_URL}/clear-database/`, {
         method: 'DELETE',
       });
 
@@ -203,7 +213,7 @@ function App() {
     } finally {
       setIsConfirmationModalOpen(false); // Cerrar el modal de confirmación
     }
-  }, [showToast]);
+  }, [showToast, API_BASE_URL]); // Añadir API_BASE_URL a las dependencias
 
   // Manejador para abrir el modal de confirmación de borrado de datos
   const openClearDataConfirmation = () => {
