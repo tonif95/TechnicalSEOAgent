@@ -1,7 +1,7 @@
 import sys
 import os
 import contextlib
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends # <--- ¡AÑADIDO 'Depends' AQUÍ!
 from pydantic import BaseModel, HttpUrl
 import uvicorn
 import asyncio
