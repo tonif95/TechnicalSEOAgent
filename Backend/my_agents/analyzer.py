@@ -1,75 +1,75 @@
 import os
 import json
-import sqlite3
-# No es necesario importar load_dotenv aquí a nivel global del archivo.
+# import sqlite3 # Ya no es necesario para PostgreSQL
 
-# Constantes
-DB_NAME = "crawler_results.db"
+# --- NUEVAS IMPORTACIONES PARA SQLAlchemy y PostgreSQL ---
+# Importamos SessionLocal y CrawledPage desde el módulo crawler
+# que ya tiene la configuración de SQLAlchemy para PostgreSQL
+from Backend.my_agents.crawler import SessionLocal, CrawledPage
+from sqlalchemy.orm import Session # Para el tipo de la sesión
+# --- FIN NUEVAS IMPORTACIONES ---
 
+# La constante DB_NAME ya no es relevante para PostgreSQL
+# DB_NAME = "crawler_results.db"
+
+# --- Función load_analysis_results_from_db modificada para PostgreSQL ---
 def load_analysis_results_from_db():
-    # ... (esta función se mantiene igual, no necesita cambios)
-    conn = None
+    """
+    Carga los resultados de análisis desde la base de datos PostgreSQL.
+    Esta función crea su propia sesión de DB, lo cual es adecuado para ser llamada
+    desde un proceso separado (_generate_report_in_process).
+    """
+    db = SessionLocal() # Crea una nueva sesión para este proceso
     try:
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        cursor.execute("SELECT url, analysis_results FROM crawled_pages")
+        # Consulta todos los resultados de la tabla CrawledPage
+        results = db.query(CrawledPage).all()
         
         all_results = []
-        for row in cursor.fetchall():
-            url = row[0]
-            analysis_json_str = row[1]
-            try:
-                analysis_data = json.loads(analysis_json_str)
-                all_results.append(analysis_data)
-            except json.JSONDecodeError as e:
-                print(f"Advertencia: Error al decodificar JSON para URL {url}: {e}")
+        for page in results:
+            # Los analysis_results ya deberían ser un diccionario Python gracias al tipo JSON en SQLAlchemy
+            if isinstance(page.analysis_results, dict):
+                all_results.append(page.analysis_results)
+            else:
+                # Si por alguna razón no es un dict (ej. datos antiguos o error), intentar parsear
+                try:
+                    analysis_data = json.loads(page.analysis_results)
+                    all_results.append(analysis_data)
+                except json.JSONDecodeError as e:
+                    print(f"Advertencia: Error al decodificar JSON para URL {page.url}: {e}")
         
         if not all_results:
-            print(f"DEBUG: No se encontraron resultados en la base de datos '{DB_NAME}'.")
-            raise Exception(f"No se encontraron resultados en la base de datos '{DB_NAME}'.")
+            print(f"DEBUG: No se encontraron resultados en la base de datos PostgreSQL.")
+            raise Exception(f"No se encontraron resultados en la base de datos PostgreSQL.")
         
         return all_results
 
-    except sqlite3.Error as e:
-        print(f"ERROR DB al cargar resultados: {e}")
-        raise Exception(f"Error de base de datos al cargar resultados: {e}")
     except Exception as e:
-        print(f"ERROR general al cargar resultados: {e}")
-        raise e
+        print(f"ERROR al cargar resultados desde PostgreSQL: {e}")
+        raise Exception(f"Error de base de datos al cargar resultados: {e}")
     finally:
-        if conn:
-            conn.close()
+        db.close() # Asegúrate de cerrar la sesión
 
 def _generate_report_in_process(result_queue):
-    # ¡Importar y cargar dotenv DENTRO del proceso hijo!
-    from dotenv import load_dotenv
-    from agents import Agent, Runner # Importar la librería 'agents' aquí dentro
+    """
+    Genera el informe SEO en un proceso separado.
+    Accede a la clave API de OpenAI directamente desde las variables de entorno.
+    """
+    # Importar la librería 'agents' aquí dentro del proceso hijo
+    # para evitar problemas de serialización si no es un módulo de nivel superior
+    from agents import Agent, Runner 
 
     try:
-        # Calcular la ruta absoluta al archivo .env.
-        # Si .env está en Backend/, necesitamos subir solo un nivel desde my_agents/
-        dotenv_path_absolute = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
-
-        print(f"[Proceso Agente] CWD del proceso hijo: {os.getcwd()}")
-        print(f"[Proceso Agente] Ruta ABSOLUTA calculada para .env: {dotenv_path_absolute}")
-
-        if not os.path.exists(dotenv_path_absolute):
-            error_msg = f"ERROR: El archivo .env NO existe en la ruta calculada: {dotenv_path_absolute}. Por favor, verifica la ubicación de tu archivo .env."
-            print(f"[Proceso Agente] {error_msg}")
-            result_queue.put({"error": error_msg})
-            return
-
-        loaded_success = load_dotenv(dotenv_path=dotenv_path_absolute, override=True, verbose=True)
-        print(f"[Proceso Agente] dotenv cargado exitosamente: {loaded_success}")
-        
+        # --- ELIMINADA TODA LA LÓGICA DE load_dotenv Y ARCHIVO .env ---
+        # Render inyectará OPENAI_API_KEY directamente en el entorno del proceso.
         openai_api_key = os.getenv("OPENAI_API_KEY")
+        
         if not openai_api_key:
-            error_msg = "OPENAI_API_KEY no está configurada en las variables de entorno del proceso hijo. ¡Verifica el archivo .env y su contenido!"
+            error_msg = "OPENAI_API_KEY no está configurada en las variables de entorno. ¡Verifica la configuración en Render!"
             print(f"[Proceso Agente] {error_msg}")
             result_queue.put({"error": error_msg})
             return
 
-        print(f"  OPENAI_API_KEY: {'*' * len(openai_api_key) if openai_api_key else 'NO ESTABLECIDA o VACÍA'}")
+        print(f"  OPENAI_API_KEY: {'*' * len(openai_api_key) if openai_api_key else 'NO ESTABLECIDA o VACÍA'}")
 
         print("✅ [Proceso Agente] Iniciando el proceso de auditoría y estrategia SEO...")
         print("\n--- [Proceso Agente] Paso 1: Ejecutando Agente Analizador (Technical SEO Expert Agent) ---")
@@ -80,17 +80,14 @@ def _generate_report_in_process(result_queue):
             "Only return bullet point lists of the issues, without any explanation or extra context."
         )
         
-        # --- ¡CAMBIO CRUCIAL AQUÍ! ---
-        # Elimina el parámetro 'api_key'. La librería 'agents' ya leerá OPENAI_API_KEY
-        # directamente de las variables de entorno porque ya las cargaste con dotenv.
+        # La librería 'agents' leerá OPENAI_API_KEY directamente de las variables de entorno
         seo_analyzer_agent = Agent(
             name="Technical SEO Expert Agent",
             instructions=instructions_analyzer,
-            model="gpt-4o-mini" # ¡Quita 'api_key=openai_api_key' de aquí!
+            model="gpt-4o-mini" 
         )
-        # --- FIN CAMBIO CRUCIAL ---
 
-        loaded_results = load_analysis_results_from_db()
+        loaded_results = load_analysis_results_from_db() # Esta función ahora usa PostgreSQL
         print(f"[Proceso Agente] DEBUG: Resultados cargados de la DB. Total de páginas: {len(loaded_results)}")
 
         prompt_analyzer = f"""
@@ -128,8 +125,14 @@ def generate_technical_seo_report_sync():
     pass 
 
 if __name__ == "__main__":
+    # Este bloque es solo para pruebas locales de analyzer.py
+    # Para que funcione, necesitarías configurar la variable de entorno OPENAI_API_KEY
+    # en tu entorno local antes de ejecutar este archivo.
+    # También necesitarías una DB PostgreSQL accesible con datos.
+
     from multiprocessing import Queue
     test_queue = Queue()
+    print("--- Ejecutando _generate_report_in_process para prueba local ---")
     _generate_report_in_process(test_queue)
     if not test_queue.empty():
         report = test_queue.get()
@@ -141,3 +144,4 @@ if __name__ == "__main__":
             print("\n--- Fin del contenido del informe ---")
     else:
         print("El proceso directo no devolvió ningún resultado.")
+    print("--- Fin de la prueba local ---")
