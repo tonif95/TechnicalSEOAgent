@@ -47,20 +47,12 @@ def save_to_database(url, original_html, prettified_html, analysis_results):
     finally:
         conn.close()
 
-def get_html_and_parse(url, base_domain, processed_urls, max_pages_to_crawl):
+def get_html_and_parse(url, base_domain): # Eliminados processed_urls y max_pages_to_crawl
     """
     Dada una URL, obtiene el código HTML y lo parsea usando BeautifulSoup.
     Retorna el objeto BeautifulSoup, el HTML original, el HTML prettificado y una lista de enlaces internos.
     """
-    if url in processed_urls:
-        print(f"Saltando URL ya procesada: {url}")
-        return None, None, None, []
-    if len(processed_urls) >= max_pages_to_crawl:
-        print(f"Alcanzado el límite de {max_pages_to_crawl} páginas para rastrear.")
-        return None, None, None, []
-
-    processed_urls.add(url) # Añadir la URL al conjunto de procesadas
-
+    # Las comprobaciones de processed_urls y max_pages_to_crawl se manejan en main.py
     try:
         print(f"\nIntentando obtener contenido de: {url}")
         response = requests.get(url, timeout=10)
@@ -268,7 +260,7 @@ if __name__ == "__main__":
         current_url = urls_to_crawl.pop(0)
 
         soup, original_html_content, prettified_html_content, found_links = \
-            get_html_and_parse(current_url, base_domain, processed_urls, MAX_PAGES)
+            get_html_and_parse(current_url, base_domain) # Eliminados processed_urls y MAX_PAGES
         
         if soup:
             analysis_results = analyze_html_content(current_url, soup)

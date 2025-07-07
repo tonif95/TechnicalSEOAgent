@@ -1,6 +1,6 @@
 import os
 from agents import Agent, Runner
-from dotenv import load_dotenv
+# from dotenv import load_dotenv # Eliminado: la clave API se pasará como argumento
 import sys
 
 # Añade el directorio padre al sys.path para poder importar seo_utils
@@ -13,6 +13,7 @@ import sys
 # o en un directorio que ya está en el PYTHONPATH.
 try:
     # Se corrige la importación a 'seo_utils' según la conversación anterior
+    # La función generate_technical_seo_report ahora NO acepta una api_key directamente
     from analyzer import generate_technical_seo_report
 except ImportError as e:
     print(f"Error al importar la función generate_technical_seo_report de seo_utils: {e}")
@@ -20,8 +21,8 @@ except ImportError as e:
     sys.exit(1)
 
 
-# Carga las variables de entorno para la clave de API de OpenAI
-load_dotenv(dotenv_path="../.env") 
+# Carga las variables de entorno para la clave de API de OpenAI (eliminado aquí, se pasará por argumento)
+# load_dotenv(dotenv_path="../.env") 
 
 class SEOStrategist:
     """
@@ -32,9 +33,10 @@ class SEOStrategist:
         # El constructor puede inicializar cualquier configuración necesaria
         pass
 
-    def generate_strategic_plan(self):
+    def generate_strategic_plan(self): # Ya no acepta openai_api_key directamente aquí
         """
         Orquesta la ejecución del Agente Estratega para generar un plan de acción SEO.
+        La clave API se espera que esté en las variables de entorno (establecida por main.py).
 
         Returns:
             str: El contenido del plan estratégico SEO generado.
@@ -55,15 +57,18 @@ class SEOStrategist:
             "Your final output should be a structured, prioritized action plan, written entirely in Spanish from Spain."
         )
 
+        # El agente ahora leerá la clave API de las variables de entorno (os.environ["OPENAI_API_KEY"])
         strategist_agent = Agent(
             name="SEO Strategist Agent",
             instructions=instructions_strategist,
-            model="gpt-4o-mini" # Puedes ajustar el modelo si es necesario
+            model="gpt-4o-mini", # Puedes ajustar el modelo si es necesario
+            # api_key=openai_api_key # Eliminado: ya no se pasa directamente aquí
         )
 
         # --- Obtener el informe directamente de la función del analizador ---
         print("\n--- Paso 1: Obteniendo el informe del Agente Analizador directamente ---")
         try:
+            # Ya no se pasa la api_key a generate_technical_seo_report
             analyzer_report_content = generate_technical_seo_report()
             print("Informe del analizador obtenido exitosamente.")
         except FileNotFoundError as e:
@@ -126,19 +131,29 @@ class SEOStrategist:
 
         print(f"\n🏆 Plan de Acción Estratégico SEO Generado y almacenado en la variable 'strategic_plan_content'.")
         print("--------------------------------------------------")
-       
-
+        
         return strategic_plan_content
 
 # Ejecutar directamente cuando el script se ejecuta
 if __name__ == "__main__":
-    strategist = SEOStrategist()
-    strategic_plan = strategist.generate_strategic_plan()
-    
-    if strategic_plan:
-        print("\n--- Contenido del plan estratégico (primeras 500 caracteres) ---")
-        print(strategic_plan[:500] + "..." if len(strategic_plan) > 500 else strategic_plan)
-        print("\n--- Fin del contenido del plan estratégico ---")
-    else:
-        print("No se pudo generar el plan estratégico.")
+    # Importante: Protege el bloque de multiprocesamiento para que funcione correctamente
+    # en diferentes sistemas operativos (especialmente Windows).
+    from multiprocessing import freeze_support
+    freeze_support() 
 
+    # NOTA: Cuando se ejecuta directamente, la clave API no se obtiene del frontend.
+    # Para pruebas locales, podrías obtenerla de una variable de entorno o un archivo .env aquí.
+    # Para el uso de la API, se espera que la clave se pase a generate_strategic_plan.
+    # Por ejemplo, para probar:
+    # test_api_key = os.getenv("OPENAI_API_KEY_TEST") # Asegúrate de tener esta variable en tu .env local para pruebas
+    # if not test_api_key:
+    #     print("ADVERTENCIA: No se encontró OPENAI_API_KEY_TEST. El agente podría fallar si no hay una clave configurada.")
+    #     test_api_key = "YOUR_FALLBACK_API_KEY_FOR_TESTING" # O una cadena vacía
+    
+    strategist = SEOStrategist()
+    # strategic_plan = strategist.generate_strategic_plan(test_api_key) # Descomentar para pruebas locales con una clave
+    print("Para ejecutar strategist.py directamente, necesitas pasar una clave API a generate_strategic_plan.")
+    print("Este script está diseñado para ser llamado por main.py, que recibirá la clave del frontend.")
+
+    # El bloque de uvicorn.run se ha movido a main.py, que es el punto de entrada de la API.
+    # Si este archivo se ejecuta de forma independiente, no iniciará un servidor FastAPI.
