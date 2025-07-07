@@ -49,27 +49,25 @@ def load_analysis_results_from_db():
     finally:
         db.close() # Asegúrate de cerrar la sesión
 
-def _generate_report_in_process(result_queue):
+# --- Función _generate_report_in_process modificada para aceptar openai_api_key ---
+def _generate_report_in_process(result_queue, openai_api_key: str):
     """
     Genera el informe SEO en un proceso separado.
-    Accede a la clave API de OpenAI directamente desde las variables de entorno.
+    Recibe la clave API de OpenAI como argumento.
     """
     # Importar la librería 'agents' aquí dentro del proceso hijo
     # para evitar problemas de serialización si no es un módulo de nivel superior
     from agents import Agent, Runner 
 
     try:
-        # --- ELIMINADA TODA LA LÓGICA DE load_dotenv Y ARCHIVO .env ---
-        # Render inyectará OPENAI_API_KEY directamente en el entorno del proceso.
-        openai_api_key = os.getenv("OPENAI_API_KEY")
-        
+        # La clave API se recibe como argumento, no se obtiene de os.getenv
         if not openai_api_key:
-            error_msg = "OPENAI_API_KEY no está configurada en las variables de entorno. ¡Verifica la configuración en Render!"
+            error_msg = "OPENAI_API_KEY no fue proporcionada al proceso de generación de informe."
             print(f"[Proceso Agente] {error_msg}")
             result_queue.put({"error": error_msg})
             return
 
-        print(f"  OPENAI_API_KEY: {'*' * len(openai_api_key) if openai_api_key else 'NO ESTABLECIDA o VACÍA'}")
+        print(f"  OPENAI_API_KEY: {'*' * len(openai_api_key) if openai_api_key else 'NO PROPORCIONADA o VACÍA'}")
 
         print("✅ [Proceso Agente] Iniciando el proceso de auditoría y estrategia SEO...")
         print("\n--- [Proceso Agente] Paso 1: Ejecutando Agente Analizador (Technical SEO Expert Agent) ---")
@@ -80,11 +78,12 @@ def _generate_report_in_process(result_queue):
             "Only return bullet point lists of the issues, without any explanation or extra context."
         )
         
-        # La librería 'agents' leerá OPENAI_API_KEY directamente de las variables de entorno
+        # Se pasa la clave API directamente al constructor del Agente
         seo_analyzer_agent = Agent(
             name="Technical SEO Expert Agent",
             instructions=instructions_analyzer,
-            model="gpt-4o-mini" 
+            model="gpt-4o-mini",
+            api_key=openai_api_key # <--- ¡CLAVE API PASADA AQUÍ!
         )
 
         loaded_results = load_analysis_results_from_db() # Esta función ahora usa PostgreSQL
@@ -126,14 +125,15 @@ def generate_technical_seo_report_sync():
 
 if __name__ == "__main__":
     # Este bloque es solo para pruebas locales de analyzer.py
-    # Para que funcione, necesitarías configurar la variable de entorno OPENAI_API_KEY
-    # en tu entorno local antes de ejecutar este archivo.
-    # También necesitarías una DB PostgreSQL accesible con datos.
+    # Para que funcione, necesitarías pasar una clave API de OpenAI válida aquí.
 
     from multiprocessing import Queue
     test_queue = Queue()
+    # Clave API de prueba para ejecución local. NO USAR EN PRODUCCIÓN.
+    dummy_api_key = os.getenv("OPENAI_API_KEY_LOCAL_TEST", "sk-your-local-test-key") 
+    
     print("--- Ejecutando _generate_report_in_process para prueba local ---")
-    _generate_report_in_process(test_queue)
+    _generate_report_in_process(test_queue, dummy_api_key) # <--- Pasar la clave API aquí
     if not test_queue.empty():
         report = test_queue.get()
         if isinstance(report, dict) and "error" in report:
