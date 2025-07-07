@@ -1,12 +1,12 @@
 import sys
 import os
 import contextlib
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends # <--- ¡AÑADIDO 'Depends' AQUÍ!
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel, HttpUrl
 import uvicorn
 import asyncio
 from urllib.parse import urlparse
-from dotenv import load_dotenv
+# from dotenv import load_dotenv # <--- ¡ELIMINADA ESTA LÍNEA!
 from multiprocessing import Process, Queue
 import time
 
@@ -27,7 +27,7 @@ from Backend.my_agents.crawler import setup_database, get_html_and_parse, analyz
 from Backend.my_agents.analyzer import _generate_report_in_process, load_analysis_results_from_db # load_analysis_results_from_db también necesitará ser actualizado
 
 # Cargar variables de entorno para el proceso principal (FastAPI)
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
+# load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env")) # <--- ¡ELIMINADA ESTA LÍNEA!
 
 # --- Dependencia para obtener una sesión de base de datos ---
 def get_db():
@@ -203,7 +203,7 @@ async def generate_seo_report():
     
     # Iniciar el proceso para generar el informe
     # El target es la función que se ejecutará en el nuevo proceso
-    process = Process(target=_generate_report_in_process, args=(result_queue,))
+    process = Process(target:_generate_report_in_process, args=(result_queue,))
     process.start() # Inicia el proceso hijo
 
     report_content = None
