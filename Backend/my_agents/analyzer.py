@@ -82,8 +82,7 @@ def _generate_report_in_process(result_queue, openai_api_key: str):
         seo_analyzer_agent = Agent(
             name="Technical SEO Expert Agent",
             instructions=instructions_analyzer,
-            model="gpt-4o-mini",
-            api_key=openai_api_key # <--- ¡CLAVE API PASADA AQUÍ!
+            model="gpt-4o-mini",            
         )
 
         loaded_results = load_analysis_results_from_db() # Esta función ahora usa PostgreSQL
