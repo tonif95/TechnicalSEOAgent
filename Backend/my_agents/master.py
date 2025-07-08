@@ -6,13 +6,10 @@ from pydantic import BaseModel, HttpUrl
 import uvicorn
 import asyncio
 from urllib.parse import urlparse
-from dotenv import load_dotenv # Mantener para desarrollo local si usas .env
+from dotenv import load_dotenv
 from multiprocessing import Process, Queue
 import time
-
-# --- NUEVA IMPORTACIÓN PARA OBTENER VARIABLES DE ENTORNO ---
-load_dotenv() # Carga variables del archivo .env si existe (solo para desarrollo local)
-# --- FIN NUEVA IMPORTACIÓN ---
+import uuid # Para generar IDs únicos para las tareas
 
 # --- IMPORTACIONES ADICIONALES PARA DB Y CORS ---
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,16 +24,19 @@ if project_root_dir not in sys.path:
 
 # Importaciones de módulos de la aplicación
 from Backend.my_agents.crawler import setup_database, get_html_and_parse, analyze_html_content, save_to_database, SessionLocal, CrawledPage
-# Importar _generate_report_in_process desde analyzer.py
 from Backend.my_agents.analyzer import _generate_report_in_process
 
 # --- OBTENER DATABASE_URL DE LAS VARIABLES DE ENTORNO ---
-# Esta es la URL que pasarás al proceso hijo.
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not DATABASE_URL:
     print("ERROR: La variable de entorno DATABASE_URL no está configurada. La aplicación no puede iniciar.")
     raise Exception("DATABASE_URL no está configurada en las variables de entorno.")
+
+# --- Diccionario para almacenar el estado de las tareas de rastreo (en memoria) ---
+# En un entorno de producción real, esto debería ser una tabla en la base de datos
+# para persistir el estado entre reinicios del servidor.
+crawl_tasks_status = {}
 
 # --- Dependencia para obtener una sesión de base de datos ---
 def get_db():
@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
     """
     print("Iniciando la aplicación FastAPI...")
     try:
-        setup_database() # setup_database usa el motor global de crawler.py
+        setup_database()
         print("Base de datos PostgreSQL verificada.")
     except Exception as e:
         print(f"ERROR: No se pudo inicializar la base de datos: {e}")
@@ -63,6 +63,8 @@ async def lifespan(app: FastAPI):
 
     yield
     print("Cerrando la aplicación FastAPI...")
+    # Limpiar el diccionario de tareas al cerrar la aplicación
+    crawl_tasks_status.clear()
 
 # Instancia principal de FastAPI
 app = FastAPI(
@@ -105,28 +107,38 @@ class GenerateReportRequest(BaseModel):
 async def start_crawl(request: CrawlRequest, background_tasks: BackgroundTasks):
     """
     Inicia un proceso de rastreo en segundo plano para la URL y el número de páginas especificados.
+    Devuelve un ID de tarea para que el frontend pueda consultar el estado.
     """
     target_url = str(request.url)
     max_pages = request.max_pages
+    task_id = str(uuid.uuid4()) # Generar un ID único para la tarea
 
     if not target_url.startswith(("http://", "https://")):
         raise HTTPException(status_code=400, detail="La URL debe comenzar con 'http://' o 'https://'")
 
-    print(f"API - Endpoint /crawl/ recibido para URL: {target_url}, max_pages: {max_pages}")
-    background_tasks.add_task(run_crawl_process, target_url, max_pages)
-    print(f"API - Tarea de rastreo añadida a BackgroundTasks.")
-    return {"message": f"Rastreo iniciado para {target_url} con un máximo de {max_pages} páginas. Esto se ejecutará en segundo plano."}
+    # Inicializar el estado de la tarea
+    crawl_tasks_status[task_id] = {"status": "pending", "progress": 0, "total_pages": max_pages, "crawled_pages": 0, "url": target_url}
 
-async def run_crawl_process(target_url: str, max_pages: int):
+    print(f"API - Endpoint /crawl/ recibido para URL: {target_url}, max_pages: {max_pages}, Task ID: {task_id}")
+    # Pasar el task_id a la tarea de fondo para que pueda actualizar su estado
+    background_tasks.add_task(run_crawl_process, target_url, max_pages, task_id)
+    print(f"API - Tarea de rastreo añadida a BackgroundTasks con ID: {task_id}.")
+    return {"message": f"Rastreo iniciado para {target_url} con un máximo de {max_pages} páginas. Esto se ejecutará en segundo plano.", "task_id": task_id}
+
+async def run_crawl_process(target_url: str, max_pages: int, task_id: str):
     """
     Lógica principal del rastreador de páginas web.
+    Actualiza el estado de la tarea en crawl_tasks_status.
     """
-    print(f"CRAWLER - INFO: run_crawl_process iniciado para {target_url} con límite de {max_pages} páginas.")
+    print(f"CRAWLER - INFO: run_crawl_process iniciado para {target_url} con límite de {max_pages} páginas. Task ID: {task_id}")
     
     if max_pages < 1:
         print("CRAWLER - WARNING: max_pages debe ser al menos 1. Ajustando a 1.")
         max_pages = 1
+        crawl_tasks_status[task_id]["total_pages"] = 1 # Actualizar el total de páginas si se ajusta
 
+    crawl_tasks_status[task_id]["status"] = "running"
+    
     try:
         parsed_target_url = urlparse(target_url)
         base_domain = parsed_target_url.netloc
@@ -146,6 +158,10 @@ async def run_crawl_process(target_url: str, max_pages: int):
                 break 
 
             processed_urls.add(current_url) 
+            # Actualizar el progreso de la tarea
+            crawl_tasks_status[task_id]["crawled_pages"] = len(processed_urls)
+            crawl_tasks_status[task_id]["progress"] = int((len(processed_urls) / max_pages) * 100)
+            
             print(f"CRAWLER - DEBUG: Procesando URL: {current_url}. Páginas procesadas hasta ahora: {len(processed_urls)}/{max_pages}. URLs restantes en cola: {len(urls_to_crawl)}")
 
             soup, original_html_content, prettified_html_content, found_links = \
@@ -177,11 +193,27 @@ async def run_crawl_process(target_url: str, max_pages: int):
 
             await asyncio.sleep(1) 
             
-        print(f"CRAWLER - INFO: Rastreo completado para {target_url}. Total de páginas procesadas: {len(processed_urls)}. Resultados en la base de datos.")
+        print(f"CRAWLER - INFO: Rastreo completado para {target_url}. Total de páginas procesadas: {len(processed_urls)}. Resultados en la base de datos. Task ID: {task_id}")
+        crawl_tasks_status[task_id]["status"] = "completed"
+        crawl_tasks_status[task_id]["progress"] = 100
+        crawl_tasks_status[task_id]["crawled_pages"] = len(processed_urls) # Asegurarse de que el conteo final sea exacto
     except Exception as e:
-        print(f"CRAWLER - ERROR: Un error inesperado ocurrió durante el rastreo: {e}")
+        print(f"CRAWLER - ERROR: Un error inesperado ocurrió durante el rastreo: {e}. Task ID: {task_id}")
         import traceback
         traceback.print_exc()
+        crawl_tasks_status[task_id]["status"] = "failed"
+        crawl_tasks_status[task_id]["error"] = str(e)
+
+# --- NUEVO ENDPOINT PARA CONSULTAR EL ESTADO DEL RASTREO ---
+@app.get("/crawl-status/{task_id}", summary="Obtener el estado de una tarea de rastreo", response_description="Estado actual de la tarea de rastreo")
+async def get_crawl_status(task_id: str):
+    """
+    Devuelve el estado actual de una tarea de rastreo específica.
+    """
+    status = crawl_tasks_status.get(task_id)
+    if not status:
+        raise HTTPException(status_code=404, detail="ID de tarea de rastreo no encontrado.")
+    return status
 
 @app.get("/results/", summary="Obtener todos los resultados de análisis de la base de datos", response_description="Lista de resultados de análisis")
 async def get_all_analysis_results(db: Session = Depends(get_db)):
@@ -215,8 +247,6 @@ async def generate_seo_report(request: GenerateReportRequest):
 
     result_queue = Queue()
     
-    # --- CAMBIO CRÍTICO AQUÍ: PASAR DATABASE_URL AL PROCESO HIJO ---
-    # Esto asegura que el proceso hijo tenga la URL para crear su propia conexión a la DB.
     process = Process(target=_generate_report_in_process, args=(result_queue, openai_api_key, DATABASE_URL))
     process.start()
 
