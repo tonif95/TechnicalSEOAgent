@@ -7,15 +7,22 @@ import Toast from './components/Toast';
 
 // Define tipos para mejorar la legibilidad y la seguridad de tipos
 interface SEOResult {
-  // Asumiendo que SEOResult tiene algunas propiedades, añádelas aquí
-  // Por ejemplo: url: string; title: string; description: string;
-  [key: string]: any; // Marcador de posición si la estructura real es desconocida
+  [key: string]: any;
 }
 
 interface ApiResponse<T> {
   data?: T;
   message?: string;
-  // Añadir otras propiedades comunes de respuesta de API si las hay
+}
+
+// Nuevo tipo para el estado de la tarea de rastreo
+interface CrawlStatus {
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress: number;
+  total_pages: number;
+  crawled_pages: number;
+  url: string;
+  error?: string;
 }
 
 // Componente de Modal de Confirmación Personalizado
@@ -56,66 +63,56 @@ const ConfirmationModal: React.FC<{
 function App() {
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false); // Nuevo estado para el modal de confirmación
-  const [results, setResults] = useState<SEOResult[]>([]); // Este estado permanecerá, aunque no se poblará con /results/
+  const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
+  const [results, setResults] = useState<SEOResult[]>([]);
   const [generatedReport, setGeneratedReport] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(false); // Para la iniciación del rastreo
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false); // Para la generación del informe
+  const [isLoading, setIsLoading] = useState(false); 
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [apiKey, setApiKey] = useState<string>(''); // Nuevo estado para almacenar la clave API
-  const [apiKeyInput, setApiKeyInput] = useState<string>(''); // Estado para el input del modal de la clave API
+  const [apiKey, setApiKey] = useState<string>('');
+  const [apiKeyInput, setApiKeyInput] = useState<string>('');
+  const [currentCrawlStatus, setCurrentCrawlStatus] = useState<CrawlStatus | null>(null); // Nuevo estado para el progreso del rastreo
 
-  // Obtener la URL base de la API desde las variables de entorno de Vite
-  // Asegúrate de que VITE_APP_API_URL esté configurada en Render para tu servicio de frontend
-  // con la URL de tu backend (ej. https://technicalseoagent.onrender.com)
-  //
-  // ¡ACTUALIZADO AQUÍ CON LA URL PROPORCIONADA!
   const API_BASE_URL = import.meta.env.VITE_APP_API_URL || "https://technicalseoagentbackend.onrender.com";
 
-  // Cargar la clave API desde localStorage al iniciar
   useEffect(() => {
     const storedApiKey = localStorage.getItem('openai_api_key');
     if (storedApiKey) {
       setApiKey(storedApiKey);
-      setApiKeyInput(storedApiKey); // También inicializar el input del modal
+      setApiKeyInput(storedApiKey);
     }
   }, []);
 
-  // Función para guardar la clave API (ahora manejada directamente en App.tsx)
   const handleSaveApiKey = () => {
-    setApiKey(apiKeyInput); // Usa el valor del input local
+    setApiKey(apiKeyInput);
     localStorage.setItem('openai_api_key', apiKeyInput);
     showToast('Clave API guardada con éxito!', 'success');
-    setIsApiKeyModalOpen(false); // Cierra el modal
+    setIsApiKeyModalOpen(false);
   };
 
-  // Función de ayuda para mostrar mensajes toast
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4000);
   }, []);
 
-  // Función para generar el informe SEO
   const handleGenerateReport = useCallback(async () => {
     if (!apiKey) {
       showToast('Por favor, introduce tu clave API de OpenAI antes de generar el informe.', 'error');
-      setIsApiKeyModalOpen(true); // Abrir el modal para que el usuario introduzca la clave
+      setIsApiKeyModalOpen(true);
       return;
     }
 
     setIsGeneratingReport(true);
     try {
-      // *** CAMBIO AQUÍ: Usar API_BASE_URL ***
       const response = await fetch(`${API_BASE_URL}/generate-report/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ openai_api_key: apiKey }), // Enviar la clave API en el cuerpo de la solicitud
+        body: JSON.stringify({ openai_api_key: apiKey }), 
       });
 
       if (!response.ok) {
-        // Intentar leer el mensaje de error del backend
         const errorData = await response.json().catch(() => ({ detail: 'Error desconocido' }));
         throw new Error(errorData.detail || 'Failed to generate report');
       }
@@ -125,9 +122,7 @@ function App() {
       setIsReportModalOpen(true);
       showToast('¡Informe SEO de IA generado con éxito!', 'success');
 
-      // --- NUEVA FUNCIONALIDAD: Eliminar datos de la base de datos después de generar el informe ---
       try {
-        // *** CAMBIO AQUÍ: Usar API_BASE_URL ***
         const clearResponse = await fetch(`${API_BASE_URL}/clear-database/`, {
           method: 'DELETE',
         });
@@ -138,13 +133,12 @@ function App() {
           showToast(`Error al limpiar la base de datos: ${errorData.detail}`, 'error');
         } else {
           showToast('Datos de la base de datos eliminados con éxito.', 'success');
-          setResults([]); // Limpiar los resultados en el frontend también
+          setResults([]);
         }
       } catch (clearError: any) {
         console.error('Error de red al intentar limpiar la base de datos:', clearError);
         showToast(`Error de red al limpiar la base de datos: ${clearError.message}`, 'error');
       }
-      // --- FIN DE LA NUEVA FUNCIONALIDAD ---
 
     } catch (error: any) {
       console.error('Error al generar el informe:', error);
@@ -152,25 +146,27 @@ function App() {
     } finally {
       setIsGeneratingReport(false);
     }
-  }, [showToast, apiKey, API_BASE_URL]); // Añadir API_BASE_URL a las dependencias
+  }, [showToast, apiKey, API_BASE_URL]);
 
-  // Función para iniciar el rastreo y luego generar el informe
+  // Función para iniciar el rastreo y luego gestionar el polling
   const handleStartCrawl = useCallback(async (url: string, maxPages: number) => {
-    if (!apiKey) { // Asegurarse de que la clave API esté presente antes de iniciar el rastreo
+    if (!apiKey) {
       showToast('Por favor, introduce tu clave API de OpenAI antes de iniciar el rastreo.', 'error');
       setIsApiKeyModalOpen(true);
       return;
     }
 
     setIsLoading(true);
+    setCurrentCrawlStatus(null); // Resetear el estado de rastreo anterior
+    showToast('Iniciando rastreo...', 'success');
+
     try {
-      // *** CAMBIO AQUÍ: Usar API_BASE_URL ***
       const response = await fetch(`${API_BASE_URL}/crawl/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url, max_pages: maxPages, openai_api_key: apiKey }), // Enviar la clave API en el cuerpo de la solicitud de rastreo
+        body: JSON.stringify({ url, max_pages: maxPages }), 
       });
 
       if (!response.ok) {
@@ -178,24 +174,47 @@ function App() {
         throw new Error(errorData.detail || 'Failed to start crawl');
       }
 
-      // El backend ahora espera a que el rastreo termine antes de responder,
-      // así que podemos llamar a handleGenerateReport con confianza.
-      console.log('Frontend: Rastreo completado según el backend. Iniciando generación de informe...'); // Nuevo log
-      showToast('¡Rastreo completado! Ahora generando el informe SEO...', 'success');
-      await handleGenerateReport();
+      const data: { message: string; task_id: string } = await response.json();
+      const taskId = data.task_id;
+      showToast(data.message, 'success');
+      
+      // Iniciar el polling para el estado del rastreo
+      let pollInterval = setInterval(async () => {
+        try {
+          const statusResponse = await fetch(`${API_BASE_URL}/crawl-status/${taskId}`);
+          if (!statusResponse.ok) {
+            throw new Error('Failed to fetch crawl status');
+          }
+          const statusData: CrawlStatus = await statusResponse.json();
+          setCurrentCrawlStatus(statusData); // Actualizar el estado en el UI
+
+          if (statusData.status === 'completed') {
+            clearInterval(pollInterval); // Detener el polling
+            showToast('¡Rastreo completado! Ahora generando el informe SEO...', 'success');
+            await handleGenerateReport(); // Llamar a la generación del informe
+            setIsLoading(false);
+          } else if (statusData.status === 'failed') {
+            clearInterval(pollInterval); // Detener el polling
+            showToast(`Rastreo fallido: ${statusData.error || 'Error desconocido'}`, 'error');
+            setIsLoading(false);
+          }
+        } catch (pollError: any) {
+          clearInterval(pollInterval); // Detener el polling en caso de error
+          console.error('Error durante el polling del estado del rastreo:', pollError);
+          showToast(`Error al verificar el estado del rastreo: ${pollError.message}`, 'error');
+          setIsLoading(false);
+        }
+      }, 3000); // Poll cada 3 segundos
 
     } catch (error: any) {
       console.error('Error al iniciar el rastreo:', error);
       showToast(`Error al iniciar el rastreo: ${error.message || 'Por favor, compruebe su URL e inténtelo de nuevo.'}`, 'error');
-    } finally {
       setIsLoading(false);
     }
-  }, [showToast, handleGenerateReport, apiKey, API_BASE_URL]); // Añadir API_BASE_URL a las dependencias
+  }, [showToast, handleGenerateReport, apiKey, API_BASE_URL]);
 
-  // Función para borrar todos los datos de análisis
   const handleClearData = useCallback(async () => {
     try {
-      // *** CAMBIO AQUÍ: Usar API_BASE_URL ***
       const response = await fetch(`${API_BASE_URL}/clear-database/`, {
         method: 'DELETE',
       });
@@ -205,17 +224,16 @@ function App() {
         throw new Error(errorData.detail || 'Failed to clear database');
       }
 
-      setResults([]); // Borrar el estado de resultados local
+      setResults([]);
       showToast('¡Todos los datos borrados con éxito!', 'success');
     } catch (error: any) {
       console.error('Error al borrar los datos:', error);
       showToast(`Error al borrar los datos: ${error.message || 'Por favor, inténtelo de nuevo.'}`, 'error');
     } finally {
-      setIsConfirmationModalOpen(false); // Cerrar el modal de confirmación
+      setIsConfirmationModalOpen(false);
     }
-  }, [showToast, API_BASE_URL]); // Añadir API_BASE_URL a las dependencias
+  }, [showToast, API_BASE_URL]);
 
-  // Manejador para abrir el modal de confirmación de borrado de datos
   const openClearDataConfirmation = () => {
     setIsConfirmationModalOpen(true);
   };
@@ -226,23 +244,38 @@ function App() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
-          {/* Panel de Control para iniciar el rastreo */}
           <ControlPanel
             onStartCrawl={handleStartCrawl}
             isLoading={isLoading}
           />
 
-          {/* Sección de Resultados (aparecerá vacía si no hay obtención directa de resultados, pero mantiene las acciones de informe/borrado) */}
+          {/* Mostrar el progreso del rastreo */}
+          {currentCrawlStatus && (
+            <div className="bg-white p-6 rounded-lg shadow-md text-center">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Estado del Rastreo: {currentCrawlStatus.status.toUpperCase()}</h3>
+              {currentCrawlStatus.status === 'running' && (
+                <p className="text-sm text-gray-700">
+                  Páginas rastreadas: {currentCrawlStatus.crawled_pages} de {currentCrawlStatus.total_pages} ({currentCrawlStatus.progress}%)
+                </p>
+              )}
+              {currentCrawlStatus.status === 'failed' && (
+                <p className="text-sm text-red-600">Error: {currentCrawlStatus.error || 'Desconocido'}</p>
+              )}
+              {currentCrawlStatus.status === 'completed' && (
+                <p className="text-sm text-green-600">Rastreo finalizado con éxito.</p>
+              )}
+            </div>
+          )}
+
           <ResultsSection
-            results={results} // Esto probablemente estará vacío ya que no se llama a /results/
-            onGenerateReport={handleGenerateReport} // Todavía disponible si es necesario, aunque ahora forma parte del flujo de rastreo
-            onClearData={openClearDataConfirmation} // Usar el nuevo manejador de confirmación
+            results={results}
+            onGenerateReport={handleGenerateReport}
+            onClearData={openClearDataConfirmation}
             isGeneratingReport={isGeneratingReport}
           />
         </div>
       </main>
 
-      {/* Modal de Clave API (ahora integrado directamente) */}
       {isApiKeyModalOpen && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 font-sans">
           <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full transform transition-all duration-300 scale-100 opacity-100">
@@ -251,21 +284,19 @@ function App() {
               Necesitas una clave API de OpenAI para generar informes SEO. Puedes obtener una en tu panel de control de OpenAI.
             </p>
             <input
-              type="password" // Usar tipo password para ocultar la clave
+              type="password"
               className="w-full p-3 border border-gray-300 rounded-md mb-6 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
               placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
               value={apiKeyInput}
-              onChange={(e) => setApiKeyInput(e.target.value)} // Actualiza el estado con el valor del input
+              onChange={(e) => setApiKeyInput(e.target.value)}
             />
             <div className="flex justify-end space-x-3">
-              {/* Botón para cancelar y cerrar el modal */}
               <button
                 onClick={() => setIsApiKeyModalOpen(false)}
                 className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors duration-200"
               >
                 Cancelar
               </button>
-              {/* Botón para guardar la clave API */}
               <button
                 onClick={handleSaveApiKey}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200"
@@ -277,14 +308,12 @@ function App() {
         </div>
       )}
 
-      {/* Modal de Visualización de Informe */}
       <ReportModal
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
         report={generatedReport}
       />
 
-      {/* Modal de Confirmación Personalizado para borrar datos */}
       <ConfirmationModal
         isOpen={isConfirmationModalOpen}
         onClose={() => setIsConfirmationModalOpen(false)}
@@ -293,7 +322,6 @@ function App() {
         message="¿Está seguro de que desea eliminar todos los datos de análisis? Esta acción no se puede deshacer."
       />
 
-      {/* Notificaciones Toast */}
       {toast && (
         <Toast
           message={toast.message}
