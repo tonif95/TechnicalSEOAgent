@@ -27,12 +27,16 @@ if project_root_dir not in sys.path:
 
 # Importaciones de módulos de la aplicación
 from Backend.my_agents.crawler import setup_database, get_html_and_parse, analyze_html_content, save_to_database, SessionLocal, CrawledPage
+# Importar _generate_report_in_process desde analyzer.py
 from Backend.my_agents.analyzer import _generate_report_in_process
 
-# --- NO NECESITAMOS OBTENER OPENAI_API_KEY DE OS.GETENV AQUÍ SI VIENE DEL FRONTEND ---
-# OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") 
-# if not OPENAI_API_KEY:
-#     print("WARNING: La variable de entorno OPENAI_API_KEY no está configurada. La generación de informes fallará.")
+# --- OBTENER DATABASE_URL DE LAS VARIABLES DE ENTORNO ---
+# Esta es la URL que pasarás al proceso hijo.
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    print("ERROR: La variable de entorno DATABASE_URL no está configurada. La aplicación no puede iniciar.")
+    raise Exception("DATABASE_URL no está configurada en las variables de entorno.")
 
 # --- Dependencia para obtener una sesión de base de datos ---
 def get_db():
@@ -51,7 +55,7 @@ async def lifespan(app: FastAPI):
     """
     print("Iniciando la aplicación FastAPI...")
     try:
-        setup_database()
+        setup_database() # setup_database usa el motor global de crawler.py
         print("Base de datos PostgreSQL verificada.")
     except Exception as e:
         print(f"ERROR: No se pudo inicializar la base de datos: {e}")
@@ -92,7 +96,7 @@ class CrawlRequest(BaseModel):
     url: HttpUrl
     max_pages: int = 5
 
-# --- NUEVO MODELO PARA LA SOLICITUD DE GENERACIÓN DE INFORME ---
+# Modelo para la solicitud de generación de informe
 class GenerateReportRequest(BaseModel):
     openai_api_key: str # La clave API que vendrá del frontend
 
@@ -179,7 +183,6 @@ async def run_crawl_process(target_url: str, max_pages: int):
         import traceback
         traceback.print_exc()
 
-# Endpoint para obtener todos los resultados de análisis
 @app.get("/results/", summary="Obtener todos los resultados de análisis de la base de datos", response_description="Lista de resultados de análisis")
 async def get_all_analysis_results(db: Session = Depends(get_db)):
     """
@@ -197,9 +200,7 @@ async def get_all_analysis_results(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al cargar resultados de la base de datos: {e}")
 
-# Endpoint para generar el informe SEO
 @app.post("/generate-report/", summary="Generar informe SEO técnico", response_description="Contenido del informe SEO")
-# --- CAMBIO CRÍTICO AQUÍ: ACEPTAR EL NUEVO MODELO DE SOLICITUD ---
 async def generate_seo_report(request: GenerateReportRequest):
     """
     Inicia la generación de un informe SEO técnico utilizando un agente de IA en un proceso separado.
@@ -207,7 +208,6 @@ async def generate_seo_report(request: GenerateReportRequest):
     """
     print("API - Solicitud para generar informe recibida.")
     
-    # Obtener la clave API del payload de la solicitud
     openai_api_key = request.openai_api_key
 
     if not openai_api_key:
@@ -215,8 +215,9 @@ async def generate_seo_report(request: GenerateReportRequest):
 
     result_queue = Queue()
     
-    # Pasa la clave API recibida del frontend al proceso hijo.
-    process = Process(target=_generate_report_in_process, args=(result_queue, openai_api_key))
+    # --- CAMBIO CRÍTICO AQUÍ: PASAR DATABASE_URL AL PROCESO HIJO ---
+    # Esto asegura que el proceso hijo tenga la URL para crear su propia conexión a la DB.
+    process = Process(target=_generate_report_in_process, args=(result_queue, openai_api_key, DATABASE_URL))
     process.start()
 
     report_content = None
@@ -262,5 +263,5 @@ async def clear_database(db: Session = Depends(get_db)):
 if __name__ == "__main__":
     from multiprocessing import freeze_support
     freeze_support() 
-    print("Para ejecutar localmente, asegúrate de que DATABASE_URL esté configurada.")
-    print("Usa 'uvicorn Backend.my_agents.master:app --reload' y configura DATABASE_URL en tu entorno.")
+    print("Para ejecutar localmente, asegúrate de que DATABASE_URL y OPENAI_API_KEY estén configuradas.")
+    print("Usa 'uvicorn Backend.my_agents.master:app --reload' y configura DATABASE_URL y OPENAI_API_KEY en tu entorno.")

@@ -1,146 +1,105 @@
 import os
 import json
-# import sqlite3 # Ya no es necesario para PostgreSQL
+# Importaciones de SQLAlchemy necesarias para crear el motor y la sesión en este proceso
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, JSON
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import func # Para CURRENT_TIMESTAMP
 
-# --- NUEVAS IMPORTACIONES PARA SQLAlchemy y PostgreSQL ---
-# Importamos SessionLocal y CrawledPage desde el módulo crawler
-# que ya tiene la configuración de SQLAlchemy para PostgreSQL
-from Backend.my_agents.crawler import SessionLocal, CrawledPage
-from sqlalchemy.orm import Session # Para el tipo de la sesión
-# --- FIN NUEVAS IMPORTACIONES ---
+# Define la Base y el modelo CrawledPage dentro de este módulo también.
+# Esto es necesario porque cada proceso necesita su propia "Base" ligada a su propio motor.
+Base = declarative_base()
 
-# La constante DB_NAME ya no es relevante para PostgreSQL
-# DB_NAME = "crawler_results.db"
+class CrawledPage(Base):
+    __tablename__ = 'crawled_pages' # Asegúrate de que el nombre de la tabla coincida con crawler.py
 
-# --- Función load_analysis_results_from_db modificada para PostgreSQL ---
-def load_analysis_results_from_db():
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    url = Column(String, unique=True, nullable=False)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+    original_html = Column(Text)
+    prettified_html = Column(Text)
+    analysis_results = Column(JSON)
+
+    def __repr__(self):
+        return f"<CrawledPage(url='{self.url}')>"
+
+# Modificamos la función para que acepte database_url como un argumento
+def _generate_report_in_process(result_queue, openai_api_key, database_url):
     """
-    Carga los resultados de análisis desde la base de datos PostgreSQL.
-    Esta función crea su propia sesión de DB, lo cual es adecuado para ser llamada
-    desde un proceso separado (_generate_report_in_process).
+    Función que se ejecuta en un proceso separado para generar el informe.
+    Inicializa su propia conexión a la base de datos.
     """
-    db = SessionLocal() # Crea una nueva sesión para este proceso
     try:
-        # Consulta todos los resultados de la tabla CrawledPage
-        results = db.query(CrawledPage).all()
+        print(f"PROCESO_ANALYZER - INFO: Iniciando generación de informe en proceso separado.")
         
-        all_results = []
-        for page in results:
-            # Los analysis_results ya deberían ser un diccionario Python gracias al tipo JSON en SQLAlchemy
-            if isinstance(page.analysis_results, dict):
-                all_results.append(page.analysis_results)
-            else:
-                # Si por alguna razón no es un dict (ej. datos antiguos o error), intentar parsear
-                try:
-                    analysis_data = json.loads(page.analysis_results)
-                    all_results.append(analysis_data)
-                except json.JSONDecodeError as e:
-                    print(f"Advertencia: Error al decodificar JSON para URL {page.url}: {e}")
+        # --- INICIALIZAR LA CONEXIÓN A LA BASE DE DATOS EN ESTE PROCESO HIJO ---
+        # Asegúrate de que la URL de la DB sea 'postgresql://' si viene como 'postgres://'
+        if database_url and database_url.startswith("postgres://"):
+            database_url = database_url.replace("postgres://", "postgresql://", 1)
         
-        if not all_results:
-            print(f"DEBUG: No se encontraron resultados en la base de datos PostgreSQL.")
-            raise Exception(f"No se encontraron resultados en la base de datos PostgreSQL.")
+        # Crear un nuevo motor y una nueva sesión para este proceso
+        engine = create_engine(database_url)
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
         
-        return all_results
+        # Opcional: Asegurarse de que las tablas existan (aunque el lifespan de FastAPI ya lo hace)
+        # Base.metadata.create_all(bind=engine) 
+        print(f"PROCESO_ANALYZER - INFO: Conexión a la base de datos establecida en el proceso hijo.")
+
+        db = SessionLocal()
+        try:
+            # Cargar todos los resultados de análisis de la base de datos
+            analysis_data = []
+            results = db.query(CrawledPage).all()
+            for page in results:
+                # Solo incluir los datos relevantes para el análisis
+                analysis_data.append({
+                    "url": page.url,
+                    "analysis_results": page.analysis_results
+                })
+            
+            print(f"PROCESO_ANALYZER - INFO: Datos de {len(analysis_data)} páginas cargados de la DB.")
+
+            # --- Lógica de generación de informe con OpenAI ---
+            # Aquí es donde integrarías la llamada a la API de OpenAI
+            # Ejemplo (necesitarías 'openai' instalado y configurado):
+            # from openai import OpenAI
+            # client = OpenAI(api_key=openai_api_key)
+            # prompt = f"Genera un informe SEO detallado basado en los siguientes datos de análisis: {json.dumps(analysis_data, indent=2)}. Destaca los puntos clave y recomendaciones."
+            # chat_completion = client.chat.completions.create(
+            #     messages=[
+            #         {"role": "user", "content": prompt}
+            #     ],
+            #     model="gpt-4o", # Puedes cambiar el modelo según tu preferencia
+            #     temperature=0.7,
+            #     max_tokens=2000
+            # )
+            # report_content = chat_completion.choices[0].message.content
+            
+            # --- Placeholder para la generación real del informe ---
+            # Reemplaza esto con tu llamada real a la API de OpenAI
+            report_content = f"INFORME SEO GENERADO POR IA:\n\n"
+            report_content += f"Basado en {len(analysis_data)} páginas rastreadas.\n"
+            report_content += f"Clave API usada (parcial): {openai_api_key[:5]}...{openai_api_key[-5:]}\n\n"
+            report_content += "--- Datos de Análisis Cargados ---\n"
+            for item in analysis_data[:3]: # Mostrar solo los primeros 3 para no saturar el informe de prueba
+                report_content += f"URL: {item['url']}\n"
+                report_content += f"Resultados Parciales: {json.dumps(item['analysis_results'], indent=2)[:200]}...\n\n"
+            report_content += "\n--- Fin de Datos de Análisis ---\n"
+            report_content += "\n[Aquí iría el informe detallado generado por la IA de OpenAI]"
+            # --- FIN Placeholder ---
+
+            print(f"PROCESO_ANALYZER - INFO: Informe generado exitosamente.")
+            result_queue.put(report_content)
+
+        except Exception as db_error:
+            db.rollback() # Asegurarse de hacer rollback en caso de error de DB
+            print(f"PROCESO_ANALYZER - ERROR: Fallo en la generación del informe: Error de base de datos al cargar resultados: {db_error}")
+            result_queue.put({"error": f"Error de base de datos al cargar resultados: {db_error}"})
+        finally:
+            db.close() # Asegurarse de cerrar la sesión de DB
 
     except Exception as e:
-        print(f"ERROR al cargar resultados desde PostgreSQL: {e}")
-        raise Exception(f"Error de base de datos al cargar resultados: {e}")
-    finally:
-        db.close() # Asegúrate de cerrar la sesión
-
-# --- Función _generate_report_in_process modificada para aceptar openai_api_key ---
-def _generate_report_in_process(result_queue, openai_api_key: str):
-    """
-    Genera el informe SEO en un proceso separado.
-    Recibe la clave API de OpenAI como argumento.
-    """
-    # Importar la librería 'agents' aquí dentro del proceso hijo
-    # para evitar problemas de serialización si no es un módulo de nivel superior
-    from agents import Agent, Runner 
-
-    try:
-        # La clave API se recibe como argumento, no se obtiene de os.getenv
-        if not openai_api_key:
-            error_msg = "OPENAI_API_KEY no fue proporcionada al proceso de generación de informe."
-            print(f"[Proceso Agente] {error_msg}")
-            result_queue.put({"error": error_msg})
-            return
-
-        print(f"  OPENAI_API_KEY: {'*' * len(openai_api_key) if openai_api_key else 'NO PROPORCIONADA o VACÍA'}")
-
-        print("✅ [Proceso Agente] Iniciando el proceso de auditoría y estrategia SEO...")
-        print("\n--- [Proceso Agente] Paso 1: Ejecutando Agente Analizador (Technical SEO Expert Agent) ---")
-
-        instructions_analyzer = (
-            "You are a professional technical SEO agent. "
-            "Your task is to identify technical SEO issues in website analysis data and produce concise, expert-level audit reports per URL. "
-            "Only return bullet point lists of the issues, without any explanation or extra context."
-        )
-        
-        # Se pasa la clave API directamente al constructor del Agente
-        seo_analyzer_agent = Agent(
-            name="Technical SEO Expert Agent",
-            instructions=instructions_analyzer,
-            model="gpt-4o-mini",            
-        )
-
-        loaded_results = load_analysis_results_from_db() # Esta función ahora usa PostgreSQL
-        print(f"[Proceso Agente] DEBUG: Resultados cargados de la DB. Total de páginas: {len(loaded_results)}")
-
-        prompt_analyzer = f"""
-        Eres un experto en SEO técnico con mucha experiencia en auditorías completas de sitios web.
-        Has recibido un JSON con datos de análisis automático de varias páginas web de un mismo sitio. Tu tarea es realizar un informe técnico global que incluya:
-        1. Una visión general del estado SEO técnico del sitio web.
-        2. Análisis de problemas recurrentes o globales que afectan a varias páginas (por ejemplo, enlazado interno, estructura de URLs, canonicales, velocidad, etc.).
-        3. Identificación de errores técnicos detectados en las páginas (por URL), como falta de etiquetas importantes, problemas de imágenes, scripts, etc.
-        4. Explicaciones claras y sencillas que ayuden a un usuario no experto a entender los problemas y por qué afectan al SEO.
-        5. Recomendaciones prácticas para solucionar cada problema, priorizando los que más impactan.
-        6. Resumen final con puntos clave para mejorar el SEO técnico globalmente.
-        Para cada página, también incluye un listado breve con los errores técnicos más importantes detectados, en formato de puntos (bullet points).
-        Evita dar explicaciones técnicas muy complejas, sé claro y conciso y hazlo en español de España.
-        Estos son los datos a analizar en JSON:
-        {json.dumps(loaded_results, indent=2, ensure_ascii=False)}
-        """
-        print("[Proceso Agente] DEBUG: Prompt para el agente analizador generado. Enviando a Runner...")
-
-        analyzer_result = Runner.run_sync(seo_analyzer_agent, prompt_analyzer)
-        print("[Proceso Agente] DEBUG: Runner.run_sync completado.")
-        analysis_report_content = analyzer_result.final_output
-        print("[Proceso Agente] DEBUG: Contenido final del informe obtenido del agente.")
-        
-        result_queue.put(analysis_report_content)
-        print("[Proceso Agente] DEBUG: Resultado puesto en la cola.")
-
-    except Exception as e:
-        error_msg = f"ERROR [Proceso Agente]: Fallo en la generación del informe: {e}"
-        print(f"[Proceso Agente] {error_msg}")
-        result_queue.put({"error": error_msg})
+        print(f"PROCESO_ANALYZER - ERROR: Error inesperado en _generate_report_in_process: {e}")
         import traceback
         traceback.print_exc()
-
-def generate_technical_seo_report_sync():
-    pass 
-
-if __name__ == "__main__":
-    # Este bloque es solo para pruebas locales de analyzer.py
-    # Para que funcione, necesitarías pasar una clave API de OpenAI válida aquí.
-
-    from multiprocessing import Queue
-    test_queue = Queue()
-    # Clave API de prueba para ejecución local. NO USAR EN PRODUCCIÓN.
-    dummy_api_key = os.getenv("OPENAI_API_KEY_LOCAL_TEST", "sk-your-local-test-key") 
-    
-    print("--- Ejecutando _generate_report_in_process para prueba local ---")
-    _generate_report_in_process(test_queue, dummy_api_key) # <--- Pasar la clave API aquí
-    if not test_queue.empty():
-        report = test_queue.get()
-        if isinstance(report, dict) and "error" in report:
-            print(f"\n--- Error al ejecutar informe directamente ---\n{report['error']}")
-        else:
-            print("\n--- Contenido del informe (primeras 500 caracteres) ---")
-            print(report[:500] + "..." if len(report) > 500 else report)
-            print("\n--- Fin del contenido del informe ---")
-    else:
-        print("El proceso directo no devolvió ningún resultado.")
-    print("--- Fin de la prueba local ---")
+        result_queue.put({"error": f"Error inesperado en el proceso de generación de informe: {e}"})
