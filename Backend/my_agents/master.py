@@ -23,6 +23,7 @@ if project_root_dir not in sys.path:
 
 # Importaciones de módulos de la aplicación
 from Backend.my_agents.crawler import setup_database, get_html_and_parse, analyze_html_content, save_to_database, SessionLocal, CrawledPage
+from Backend.my_agents.analyzer import _generate_report_in_process
 
 # --- Dependencia para obtener una sesión de base de datos ---
 def get_db():
