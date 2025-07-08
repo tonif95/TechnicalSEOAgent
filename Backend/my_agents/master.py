@@ -6,9 +6,13 @@ from pydantic import BaseModel, HttpUrl
 import uvicorn
 import asyncio
 from urllib.parse import urlparse
-from dotenv import load_dotenv
+from dotenv import load_dotenv # Mantener para desarrollo local si usas .env
 from multiprocessing import Process, Queue
 import time
+
+# --- NUEVA IMPORTACIÓN PARA OBTENER VARIABLES DE ENTORNO ---
+load_dotenv() # Carga variables del archivo .env si existe (solo para desarrollo local)
+# --- FIN NUEVA IMPORTACIÓN ---
 
 # --- IMPORTACIONES ADICIONALES PARA DB Y CORS ---
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,6 +28,11 @@ if project_root_dir not in sys.path:
 # Importaciones de módulos de la aplicación
 from Backend.my_agents.crawler import setup_database, get_html_and_parse, analyze_html_content, save_to_database, SessionLocal, CrawledPage
 from Backend.my_agents.analyzer import _generate_report_in_process
+
+# --- NO NECESITAMOS OBTENER OPENAI_API_KEY DE OS.GETENV AQUÍ SI VIENE DEL FRONTEND ---
+# OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") 
+# if not OPENAI_API_KEY:
+#     print("WARNING: La variable de entorno OPENAI_API_KEY no está configurada. La generación de informes fallará.")
 
 # --- Dependencia para obtener una sesión de base de datos ---
 def get_db():
@@ -60,7 +69,7 @@ app = FastAPI(
 )
 
 # --- CONFIGURACIÓN DE CORS ---
-FRONTEND_RENDER_URL = "https://technicalseoagent-1.onrender.com" # <--- ¡REEMPLAZA CON LA URL REAL DE TU FRONTEND!
+FRONTEND_RENDER_URL = "https://technicalseoagent-1.onrender.com"
 
 origins = [
     "http://localhost",
@@ -82,6 +91,10 @@ app.add_middleware(
 class CrawlRequest(BaseModel):
     url: HttpUrl
     max_pages: int = 5
+
+# --- NUEVO MODELO PARA LA SOLICITUD DE GENERACIÓN DE INFORME ---
+class GenerateReportRequest(BaseModel):
+    openai_api_key: str # La clave API que vendrá del frontend
 
 # Endpoint para iniciar el rastreo
 @app.post("/crawl/", summary="Iniciar rastreo de un sitio web", response_description="Mensaje de inicio de rastreo")
@@ -106,7 +119,6 @@ async def run_crawl_process(target_url: str, max_pages: int):
     """
     print(f"CRAWLER - INFO: run_crawl_process iniciado para {target_url} con límite de {max_pages} páginas.")
     
-    # Validar que max_pages sea al menos 1
     if max_pages < 1:
         print("CRAWLER - WARNING: max_pages debe ser al menos 1. Ajustando a 1.")
         max_pages = 1
@@ -118,24 +130,17 @@ async def run_crawl_process(target_url: str, max_pages: int):
         urls_to_crawl = [target_url]
         processed_urls = set()
         
-        # Usamos una lista para URLs pendientes de añadir a la cola, para no modificar la cola mientras iteramos sobre ella
-        # Aunque aquí el pop(0) lo haría seguro, es una buena práctica para bucles donde la iteración es directa sobre la lista.
-        # No obstante, el principal error estaba en el len(processed_urls) y el break.
-        
         while urls_to_crawl and len(processed_urls) < max_pages:
-            current_url = urls_to_crawl.pop(0) # Obtener la siguiente URL de la cola
+            current_url = urls_to_crawl.pop(0)
 
-            # PRIMERO: Comprobamos si la URL ya ha sido procesada o si estamos a punto de superar el límite
             if current_url in processed_urls:
                 print(f"CRAWLER - INFO: Saltando URL ya procesada: {current_url}")
-                continue # Pasa a la siguiente iteración del bucle while
+                continue
             
             if len(processed_urls) >= max_pages:
                 print(f"CRAWLER - INFO: Límite de {max_pages} páginas alcanzado. No se procesarán más.")
-                break # Salir del bucle while principal
+                break 
 
-            # AÑADIR LA URL AL CONJUNTO DE PROCESADAS ANTES DE PROCESARLA
-            # Esto es CRUCIAL para que el contador de 'processed_urls' aumente.
             processed_urls.add(current_url) 
             print(f"CRAWLER - DEBUG: Procesando URL: {current_url}. Páginas procesadas hasta ahora: {len(processed_urls)}/{max_pages}. URLs restantes en cola: {len(urls_to_crawl)}")
 
@@ -155,28 +160,24 @@ async def run_crawl_process(target_url: str, max_pages: int):
             else:
                 print(f"CRAWLER - WARNING: 'soup' es None para {current_url}. No se pudo obtener/parsear el HTML. Saltando análisis y guardado.")
 
-            # AÑADIR NUEVOS ENLACES A LA COLA SOLO SI NO SE HA ALCANZADO EL LÍMITE Y NO ESTÁN YA EN PROCESADAS/COLA
             for link in found_links:
-                # Comprobar si el enlace pertenece al mismo dominio base y si NO ha sido ya procesado
-                # NI está ya en la cola de urls_to_crawl
                 if urlparse(link).netloc == base_domain and \
                    link not in processed_urls and \
-                   link not in urls_to_crawl: # <--- IMPORTANTE: Evitar duplicados en la cola
+                   link not in urls_to_crawl:
                     
-                    if len(processed_urls) + len(urls_to_crawl) < max_pages: # Contar las páginas procesadas MÁS las que ya están en cola
+                    if len(processed_urls) < max_pages:
                         urls_to_crawl.append(link)
                     else:
-                        print(f"CRAWLER - INFO: Límite de páginas {max_pages} (procesadas + en cola) alcanzado. No se añadirán más enlaces a la cola después de: {link}")
-                        break # Salir del bucle 'for link in found_links'
+                        print(f"CRAWLER - INFO: Límite de páginas {max_pages} (procesadas) alcanzado. No se añadirán más enlaces a la cola después de: {link}")
+                        break 
 
-            # Pequeña pausa para evitar sobrecargar el servidor y ser respetuosos con el sitio web
             await asyncio.sleep(1) 
             
         print(f"CRAWLER - INFO: Rastreo completado para {target_url}. Total de páginas procesadas: {len(processed_urls)}. Resultados en la base de datos.")
     except Exception as e:
         print(f"CRAWLER - ERROR: Un error inesperado ocurrió durante el rastreo: {e}")
         import traceback
-        traceback.print_exc() # Imprimir el stack trace completo para depuración
+        traceback.print_exc()
 
 # Endpoint para obtener todos los resultados de análisis
 @app.get("/results/", summary="Obtener todos los resultados de análisis de la base de datos", response_description="Lista de resultados de análisis")
@@ -198,15 +199,24 @@ async def get_all_analysis_results(db: Session = Depends(get_db)):
 
 # Endpoint para generar el informe SEO
 @app.post("/generate-report/", summary="Generar informe SEO técnico", response_description="Contenido del informe SEO")
-async def generate_seo_report():
+# --- CAMBIO CRÍTICO AQUÍ: ACEPTAR EL NUEVO MODELO DE SOLICITUD ---
+async def generate_seo_report(request: GenerateReportRequest):
     """
     Inicia la generación de un informe SEO técnico utilizando un agente de IA en un proceso separado.
+    La clave API se recibe del frontend en el payload.
     """
     print("API - Solicitud para generar informe recibida.")
     
+    # Obtener la clave API del payload de la solicitud
+    openai_api_key = request.openai_api_key
+
+    if not openai_api_key:
+        raise HTTPException(status_code=400, detail="La clave API de OpenAI es requerida en el payload.")
+
     result_queue = Queue()
     
-    process = Process(target=_generate_report_in_process, args=(result_queue,))
+    # Pasa la clave API recibida del frontend al proceso hijo.
+    process = Process(target=_generate_report_in_process, args=(result_queue, openai_api_key))
     process.start()
 
     report_content = None
