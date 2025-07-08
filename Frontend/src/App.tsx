@@ -68,6 +68,8 @@ function App() {
   // Obtener la URL base de la API desde las variables de entorno de Vite
   // Asegúrate de que VITE_APP_API_URL esté configurada en Render para tu servicio de frontend
   // con la URL de tu backend (ej. https://technicalseoagent.onrender.com)
+  //
+  // ¡ACTUALIZADO AQUÍ CON LA URL PROPORCIONADA!
   const API_BASE_URL = import.meta.env.VITE_APP_API_URL || "https://technicalseoagentbackend.onrender.com";
 
   // Cargar la clave API desde localStorage al iniciar
@@ -103,13 +105,13 @@ function App() {
 
     setIsGeneratingReport(true);
     try {
+      // *** CAMBIO AQUÍ: Usar API_BASE_URL ***
       const response = await fetch(`${API_BASE_URL}/generate-report/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        // *** CAMBIO CRÍTICO AQUÍ: Cambiar 'api_key' a 'openai_api_key' ***
-        body: JSON.stringify({ openai_api_key: apiKey }), 
+        body: JSON.stringify({ openai_api_key: apiKey }), // Enviar la clave API en el cuerpo de la solicitud
       });
 
       if (!response.ok) {
@@ -125,6 +127,7 @@ function App() {
 
       // --- NUEVA FUNCIONALIDAD: Eliminar datos de la base de datos después de generar el informe ---
       try {
+        // *** CAMBIO AQUÍ: Usar API_BASE_URL ***
         const clearResponse = await fetch(`${API_BASE_URL}/clear-database/`, {
           method: 'DELETE',
         });
@@ -161,13 +164,13 @@ function App() {
 
     setIsLoading(true);
     try {
+      // *** CAMBIO AQUÍ: Usar API_BASE_URL ***
       const response = await fetch(`${API_BASE_URL}/crawl/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        // *** CAMBIO AQUÍ: Eliminar 'api_key' del body de la solicitud de rastreo ***
-        body: JSON.stringify({ url, max_pages: maxPages }), 
+        body: JSON.stringify({ url, max_pages: maxPages, openai_api_key: apiKey }), // Enviar la clave API en el cuerpo de la solicitud de rastreo
       });
 
       if (!response.ok) {
@@ -192,6 +195,7 @@ function App() {
   // Función para borrar todos los datos de análisis
   const handleClearData = useCallback(async () => {
     try {
+      // *** CAMBIO AQUÍ: Usar API_BASE_URL ***
       const response = await fetch(`${API_BASE_URL}/clear-database/`, {
         method: 'DELETE',
       });
