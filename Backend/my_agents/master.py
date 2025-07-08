@@ -1,19 +1,17 @@
 import sys
 import os
 import contextlib
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends # <--- ¡AÑADIDO 'Depends' AQUÍ!
-from pydantic import BaseModel, HttpUrl
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from pydantic import BaseModel, HttpUrl # Asegúrate de que BaseModel esté importado
 import uvicorn
 import asyncio
 from urllib.parse import urlparse
-from dotenv import load_dotenv
 from multiprocessing import Process, Queue
 import time
-
 # --- IMPORTACIONES ADICIONALES PARA DB Y CORS ---
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session # Para la dependencia de la sesión de DB
-from sqlalchemy import text # Para ejecutar SQL crudo en clear_database
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 # --- FIN IMPORTACIONES ADICIONALES ---
 
 # Configuración de PYTHONPATH para asegurar que se puedan importar módulos locales
@@ -22,9 +20,8 @@ if project_root_dir not in sys.path:
     sys.path.insert(0, project_root_dir)
 
 # Importaciones de módulos de la aplicación
-# Ahora importamos SessionLocal y CrawledPage desde crawler para interactuar con la DB
-from Backend.my_agents.crawler import setup_database, get_html_and_parse, analyze_html_content, save_to_database, SessionLocal, CrawledPage # Importar SessionLocal y CrawledPage
-from Backend.my_agents.analyzer import _generate_report_in_process, load_analysis_results_from_db # load_analysis_results_from_db también necesitará ser actualizado
+from Backend.my_agents.crawler import setup_database, get_html_and_parse, analyze_html_content, save_to_database, SessionLocal, CrawledPage
+from Backend.my_agents.analyzer import _generate_report_in_process, load_analysis_results_from_db
 
 
 
@@ -45,11 +42,10 @@ async def lifespan(app: FastAPI):
     """
     print("Iniciando la aplicación FastAPI...")
     try:
-        setup_database() # setup_database ahora usa el motor de SQLAlchemy
+        setup_database()
         print("Base de datos PostgreSQL verificada.")
     except Exception as e:
         print(f"ERROR: No se pudo inicializar la base de datos: {e}")
-        # Es crucial que la aplicación no inicie si la DB no está lista
         raise
 
     yield
@@ -64,19 +60,13 @@ app = FastAPI(
 )
 
 # --- CONFIGURACIÓN DE CORS ---
-# Obtén la URL de tu frontend desplegado en Render.com
-# 1. Ve a tu dashboard de Render.
-# 2. Ve a tu servicio de frontend (ej. 'TechnicalSEOAgent-1').
-# 3. Copia su "External URL" (ej. https://technicalseoagent-1.onrender.com).
-#
-# Es MUY IMPORTANTE que esta URL sea la correcta.
 FRONTEND_RENDER_URL = "https://technicalseoagent-1.onrender.com" # <--- ¡REEMPLAZA CON LA URL REAL DE TU FRONTEND!
 
 origins = [
     "http://localhost",
-    "http://localhost:5173",  # Para desarrollo local de Vite
-    "http://127.0.0.1:5173",  # Para desarrollo local de Vite
-    FRONTEND_RENDER_URL,      # La URL de tu frontend desplegado en Render
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    FRONTEND_RENDER_URL,
 ]
 
 app.add_middleware(
@@ -93,6 +83,13 @@ app.add_middleware(
 class CrawlRequest(BaseModel):
     url: HttpUrl
     max_pages: int = 5
+    # Añadir api_key al modelo de solicitud de rastreo si es necesario para el rastreador
+    # Aunque el error actual es en generate-report, si el crawler también usa la clave, se necesita aquí
+    api_key: str = None # Hacemos que sea opcional por si no siempre se envía con el rastreo.
+
+# Modelo para la solicitud de generación de informe (¡NUEVO!)
+class GenerateReportRequest(BaseModel):
+    api_key: str # La clave API de OpenAI que viene del frontend
 
 # Endpoint para iniciar el rastreo
 @app.post("/crawl/", summary="Iniciar rastreo de un sitio web", response_description="Mensaje de inicio de rastreo")
@@ -102,6 +99,9 @@ async def start_crawl(request: CrawlRequest, background_tasks: BackgroundTasks):
     """
     target_url = str(request.url)
     max_pages = request.max_pages
+    # La api_key se recibe aquí, pero no se usa directamente en run_crawl_process
+    # Se usará en generate_seo_report después del rastreo.
+    # api_key_from_frontend = request.api_key # Puedes accederla si run_crawl_process la necesitara
 
     if not target_url.startswith(("http://", "https://")):
         raise HTTPException(status_code=400, detail="La URL debe comenzar con 'http://' o 'https://'")
@@ -137,7 +137,7 @@ async def run_crawl_process(target_url: str, max_pages: int):
                 break 
 
             soup, original_html_content, prettified_html_content, found_links = \
-                get_html_and_parse(current_url, base_domain) # Eliminados processed_urls y MAX_PAGES
+                get_html_and_parse(current_url, base_domain)
 
             if soup:
                 print(f"CRAWLER - DEBUG: 'soup' obtenido para {current_url}. Contiene HTML parseado.")
@@ -154,32 +154,28 @@ async def run_crawl_process(target_url: str, max_pages: int):
 
             for link in found_links:
                 if link not in processed_urls and urlparse(link).netloc == base_domain:
-                    if len(processed_urls) < max_pages: 
+                    if len(processed_urls) < max_pages:
                         urls_to_crawl.append(link)
                     else:
                         print(f"CRAWLER - INFO: Límite de páginas alcanzado al añadir nuevo enlace: {link}")
                         break
 
-            await asyncio.sleep(1) # Pequeña pausa para evitar sobrecargar el servidor
+            await asyncio.sleep(1)
             
         print(f"CRAWLER - INFO: Rastreo completado para {target_url}. Total de páginas procesadas: {len(processed_urls)}. Resultados en la base de datos.")
     except Exception as e:
         print(f"CRAWLER - ERROR: Un error inesperado ocurrió durante el rastreo: {e}")
         import traceback
-        traceback.print_exc() # Imprimir el stack trace completo para depuración
+        traceback.print_exc()
 
 # Endpoint para obtener todos los resultados de análisis
 @app.get("/results/", summary="Obtener todos los resultados de análisis de la base de datos", response_description="Lista de resultados de análisis")
-# --- CAMBIO AQUÍ: Usar get_db para obtener la sesión ---
 async def get_all_analysis_results(db: Session = Depends(get_db)):
     """
     Recupera y devuelve todos los resultados de análisis guardados en la base de datos.
     """
     try:
-        # Ahora load_analysis_results_from_db necesitará la sesión de DB
-        # O podemos implementar la lógica directamente aquí
         results = db.query(CrawledPage).all()
-        # Convertir objetos SQLAlchemy a diccionarios para la respuesta JSON
         return [
             {
                 "url": page.url,
@@ -192,46 +188,41 @@ async def get_all_analysis_results(db: Session = Depends(get_db)):
 
 # Endpoint para generar el informe SEO
 @app.post("/generate-report/", summary="Generar informe SEO técnico", response_description="Contenido del informe SEO")
-async def generate_seo_report():
+async def generate_seo_report(request: GenerateReportRequest): # <--- ¡CAMBIO AQUÍ! Recibe el modelo Pydantic
     """
     Inicia la generación de un informe SEO técnico utilizando un agente de IA en un proceso separado.
     """
     print("API - Solicitud para generar informe recibida.")
     
-    result_queue = Queue() # Cola para comunicar resultados del proceso hijo
+    openai_api_key = request.api_key # <--- ¡OBTENEMOS LA CLAVE DEL CUERPO DE LA SOLICITUD!
+    
+    result_queue = Queue()
     
     # Iniciar el proceso para generar el informe
-    # El target es la función que se ejecutará en el nuevo proceso
-    process = Process(target=_generate_report_in_process, args=(result_queue,))
-    process.start() # Inicia el proceso hijo
+    # ¡Pasa el openai_api_key como un argumento!
+    process = Process(target=_generate_report_in_process, args=(result_queue, openai_api_key))
+    process.start()
 
     report_content = None
     try:
-        # Espera de forma asíncrona por el resultado de la cola del proceso hijo
-        # Añade un timeout para evitar que la petición se quede colgada indefinidamente
-        report_content = await asyncio.to_thread(result_queue.get, timeout=300) # Timeout en segundos (5 minutos)
+        report_content = await asyncio.to_thread(result_queue.get, timeout=300)
         
         if isinstance(report_content, dict) and "error" in report_content:
-            # Si el proceso hijo devolvió un error, lo propagamos como una HTTPException
             raise HTTPException(status_code=500, detail=f"Error al generar el informe SEO en proceso hijo: {report_content['error']}")
 
         return {"report": report_content}
     except Exception as e:
         print(f"API - Error al generar el informe (principal): {e}")
-        # Intentar terminar el proceso hijo si todavía está vivo después de un error
         if process.is_alive():
             print("API - DEBUG: El proceso del informe sigue vivo, intentando terminarlo.")
-            process.terminate() # Envía una señal de terminación
-            process.join()      # Espera a que el proceso termine
+            process.terminate()
+            process.join()
         
-        # Proporcionar mensajes de error más específicos al cliente
         if "Empty" in str(e) or "timed out" in str(e):
-             raise HTTPException(status_code=504, detail=f"La generación del informe tardó demasiado y excedió el tiempo límite. {e}")
+            raise HTTPException(status_code=504, detail=f"La generación del informe tardó demasiado y excedió el tiempo límite. {e}")
         else:
-            # Captura otros errores inesperados
             raise HTTPException(status_code=500, detail=f"Error al generar el informe SEO: {e}")
     finally:
-        # Asegurarse de que el proceso hijo termine, incluso si no hubo error
         if process.is_alive():
             print("API - DEBUG: Finalizando el proceso del informe.")
             process.terminate()
@@ -239,27 +230,21 @@ async def generate_seo_report():
 
 # Endpoint para limpiar la base de datos
 @app.delete("/clear-database/", summary="Limpiar la base de datos", response_description="Mensaje de confirmación de limpieza")
-# --- CAMBIO AQUÍ: Usar get_db para obtener la sesión y SQLAlchemy para borrar ---
 async def clear_database(db: Session = Depends(get_db)):
     """
     Elimina todos los datos de la tabla 'crawled_pages' en la base de datos.
     """
     try:
-        # Ejecutar un DELETE FROM en la tabla
         db.execute(text("DELETE FROM crawled_pages"))
         db.commit()
         return {"message": "Base de datos limpiada exitosamente."}
     except Exception as e:
-        db.rollback() # Hacer rollback en caso de error
+        db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al limpiar la base de datos: {e}")
 
 # Bloque de ejecución principal para Uvicorn (solo para desarrollo local)
 if __name__ == "__main__":
     from multiprocessing import freeze_support
-    freeze_support() 
-    # Para ejecutar localmente con PostgreSQL, necesitarías configurar DATABASE_URL
-    # en tu entorno local (ej. con un .env o directamente en la terminal)
-    # y luego ejecutar este archivo.
-    # uvicorn.run(app, host="0.0.0.0", port=8000)
+    freeze_support()
     print("Para ejecutar localmente, asegúrate de que DATABASE_URL esté configurada.")
     print("Usa 'uvicorn Backend.my_agents.master:app --reload' y configura DATABASE_URL en tu entorno.")
