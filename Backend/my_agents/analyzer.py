@@ -49,7 +49,7 @@ def load_analysis_results_from_db():
     finally:
         db.close() # Asegúrate de cerrar la sesión
 
-# --- Función _generate_report_in_process modificada ---
+# --- Función _generate_report_in_process modificada para aceptar openai_api_key ---
 def _generate_report_in_process(result_queue, openai_api_key: str):
     """
     Genera el informe SEO en un proceso separado.
@@ -60,19 +60,14 @@ def _generate_report_in_process(result_queue, openai_api_key: str):
     from agents import Agent, Runner 
 
     try:
+        # La clave API se recibe como argumento, no se obtiene de os.getenv
         if not openai_api_key:
             error_msg = "OPENAI_API_KEY no fue proporcionada al proceso de generación de informe."
             print(f"[Proceso Agente] {error_msg}")
             result_queue.put({"error": error_msg})
             return
 
-        print(f"  OPENAI_API_KEY: {'*' * len(openai_api_key) if openai_api_key else 'NO PROPORCIONADA o VACÍA'}")
-
-        # --- ¡CAMBIO CRÍTICO AQUÍ! ---
-        # Configurar la clave API como una variable de entorno TEMPORALMENTE
-        # Esto es lo que la mayoría de las librerías OpenAI esperan por defecto
-        os.environ["OPENAI_API_KEY"] = openai_api_key
-        print("[Proceso Agente] DEBUG: OPENAI_API_KEY configurada en el entorno del proceso.")
+        print(f"  OPENAI_API_KEY: {'*' * len(openai_api_key) if openai_api_key else 'NO PROPORCIONADA o VACÍA'}")
 
         print("✅ [Proceso Agente] Iniciando el proceso de auditoría y estrategia SEO...")
         print("\n--- [Proceso Agente] Paso 1: Ejecutando Agente Analizador (Technical SEO Expert Agent) ---")
@@ -83,15 +78,15 @@ def _generate_report_in_process(result_queue, openai_api_key: str):
             "Only return bullet point lists of the issues, without any explanation or extra context."
         )
         
-        # Ahora el Agente no necesita el argumento api_key, lo leerá del entorno
+        # Se pasa la clave API directamente al constructor del Agente
         seo_analyzer_agent = Agent(
             name="Technical SEO Expert Agent",
             instructions=instructions_analyzer,
             model="gpt-4o-mini",
-            # api_key=openai_api_key # <--- ¡ELIMINAR ESTA LÍNEA!
+            api_key=openai_api_key # <--- ¡CLAVE API PASADA AQUÍ!
         )
 
-        loaded_results = load_analysis_results_from_db()
+        loaded_results = load_analysis_results_from_db() # Esta función ahora usa PostgreSQL
         print(f"[Proceso Agente] DEBUG: Resultados cargados de la DB. Total de páginas: {len(loaded_results)}")
 
         prompt_analyzer = f"""
@@ -124,14 +119,6 @@ def _generate_report_in_process(result_queue, openai_api_key: str):
         result_queue.put({"error": error_msg})
         import traceback
         traceback.print_exc()
-    finally:
-        # Es buena práctica limpiar la variable de entorno después de usarla,
-        # aunque en un proceso que termina esto no siempre es estrictamente necesario,
-        # ayuda a evitar fugas si el proceso se reutilizara.
-        if "OPENAI_API_KEY" in os.environ:
-            del os.environ["OPENAI_API_KEY"]
-            print("[Proceso Agente] DEBUG: OPENAI_API_KEY eliminada del entorno del proceso.")
-
 
 def generate_technical_seo_report_sync():
     pass 
