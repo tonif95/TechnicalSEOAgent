@@ -5,8 +5,7 @@ import re
 from urllib.parse import urlparse, urljoin
 import json
 import time
-import sys
-# import sqlite3 # Ya no necesitamos sqlite3 directamente
+import sys # Se mantiene para la configuración de PYTHONPATH, pero no para argumentos de línea de comandos
 
 # --- NUEVAS IMPORTACIONES PARA SQLAlchemy y PostgreSQL ---
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, JSON
@@ -16,19 +15,15 @@ from sqlalchemy.sql import func # Para CURRENT_TIMESTAMP
 # --- FIN NUEVAS IMPORTACIONES ---
 
 # Configuración de PYTHONPATH para asegurar que se puedan importar módulos locales
+# Esto es importante para que FastAPI pueda encontrar los módulos correctamente en Render
 project_root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root_dir not in sys.path:
     sys.path.insert(0, project_root_dir)
 
-# Nombre de la base de datos SQLite (ya no se usa directamente, pero se mantiene la referencia)
-# DB_NAME = "crawler_results.db" # Esta constante ya no es relevante para PostgreSQL
-
 # --- Configuración de SQLAlchemy ---
-# La URL de la base de datos se obtendrá de una variable de entorno en master.py
-DATABASE_URL = os.getenv("DATABASE_URL") # Esto se leerá desde el entorno de Render
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Ajuste para Render: si la URL de la DB empieza con 'postgres://', cámbiala a 'postgresql://'
-# Esto es un requisito común de SQLAlchemy para URLs de Render/Heroku
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
@@ -63,7 +58,7 @@ def setup_database():
         print("Tabla 'crawled_pages' verificada/creada en PostgreSQL.")
     except Exception as e:
         print(f"ERROR: No se pudo conectar o crear la tabla en PostgreSQL: {e}")
-        raise # Propagar el error para que el lifespan lo capture
+        raise # Propagar el error para que el lifespan lo capture (en master.py)
 
 def save_to_database(url, original_html, prettified_html, analysis_results):
     """Guarda el HTML original, el HTML prettificado y los resultados del análisis en la base de datos."""
@@ -99,12 +94,11 @@ def save_to_database(url, original_html, prettified_html, analysis_results):
     finally:
         db.close()
 
-def get_html_and_parse(url, base_domain): # Eliminados processed_urls y max_pages_to_crawl
+def get_html_and_parse(url, base_domain):
     """
     Dada una URL, obtiene el código HTML y lo parsea usando BeautifulSoup.
     Retorna el objeto BeautifulSoup, el HTML original, el HTML prettificado y una lista de enlaces internos.
     """
-    # Las comprobaciones de processed_urls y max_pages_to_crawl se manejan en main.py
     try:
         print(f"\nIntentando obtener contenido de: {url}")
         response = requests.get(url, timeout=10)
@@ -123,6 +117,7 @@ def get_html_and_parse(url, base_domain): # Eliminados processed_urls y max_page
             full_url = urljoin(url, href)
             parsed_full_url = urlparse(full_url)
             
+            # Filtra enlaces a otros dominios y a tipos de archivos específicos
             if parsed_full_url.netloc == base_domain and not parsed_full_url.path.lower().endswith(('.pdf', '.zip', '.rar', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.jpg', '.jpeg', '.png', '.gif', '.svg')):
                 clean_url = urljoin(full_url, parsed_full_url.path)
                 if parsed_full_url.query:
@@ -130,7 +125,7 @@ def get_html_and_parse(url, base_domain): # Eliminados processed_urls y max_page
                 
                 found_internal_links.append(clean_url)
 
-        print("Enlaces internos encontrados para rastreo posterior.")
+        print(f"Se encontraron {len(found_internal_links)} enlaces internos para posible rastreo posterior.")
         return soup, html_content, prettified_html_content, found_internal_links
 
     except requests.exceptions.RequestException as e:
@@ -148,7 +143,7 @@ def analyze_html_content(url, parsed_soup_object):
         print("\nNo se pudo parsear el contenido HTML. No se realizará el análisis detallado.")
         return None
 
-    print("\n--- ¡Iniciando análisis detallado del HTML! ---")
+    print(f"\n--- Iniciando análisis detallado del HTML para: {url} ---")
 
     analysis_results = {
         "url": url,
@@ -205,7 +200,7 @@ def analyze_html_content(url, parsed_soup_object):
             analysis_results["meta_robots"] = content
         elif name == 'viewport':
             analysis_results["viewport"] = content
-            if 'width=device-width' in content and 'initial-scale' in content:
+            if content and 'width=device-width' in content and 'initial-scale' in content:
                 analysis_results["mobile_friendly_meta_tags"] = True
 
     canonical_link = parsed_soup_object.find('link', rel='canonical')
@@ -284,57 +279,12 @@ def analyze_html_content(url, parsed_soup_object):
         analysis_results["robots_txt_status"] = f"Error: {e}"
         print(f"Error al obtener robots.txt: {e}")
     
-    default_sitemap_xml = urljoin(base_url_for_robots, '/sitemap.xml')
-    if default_sitemap_xml not in analysis_results["sitemap_links"]:
-        analysis_results["sitemap_links"].append(default_sitemap_xml + " (Default check)")
+    # Se ha eliminado la adición incondicional de /sitemap.xml por defecto
+    # Si la lógica de sitemap.xml debe ser diferente, se manejará en master.py o en un módulo específico de sitemap.
 
     return analysis_results
 
-
-# El bloque if __name__ == "__main__": no es relevante para la ejecución de FastAPI en Render
-# ya que Uvicorn lo ejecuta directamente. Solo es para pruebas locales de crawler.py
-if __name__ == "__main__":
-    # setup_database() # Esto se llama desde lifespan en master.py
-
-    if len(sys.argv) > 1:
-        target_url = sys.argv[1]
-    else:
-        print("Error: No se proporcionó ninguna URL. Uso: python crawler.py <URL>")
-        sys.exit(1)
-
-    MAX_PAGES = 20
-
-    parsed_target_url = urlparse(target_url)
-    base_domain = parsed_target_url.netloc
-
-    urls_to_crawl = [target_url]
-    processed_urls = set()
-    
-    while urls_to_crawl and len(processed_urls) < MAX_PAGES:
-        current_url = urls_to_crawl.pop(0)
-
-        # Aquí necesitas pasar la sesión de la base de datos si quieres interactuar
-        # con ella en este bloque de prueba.
-        # Para el propósito de este ejemplo, asumimos que save_to_database
-        # maneja su propia sesión.
-        soup, original_html_content, prettified_html_content, found_links = \
-            get_html_and_parse(current_url, base_domain) # Eliminados processed_urls y MAX_PAGES
-        
-        if soup:
-            analysis_results = analyze_html_content(current_url, soup)
-            if analysis_results:
-                # Guardar en la base de datos
-                # save_to_database(current_url, original_html_content, prettified_html_content, analysis_results)
-                print(f"Análisis y guardado en DB completado para: {current_url} (simulado para pruebas locales)")
-
-            for link in found_links:
-                if link not in processed_urls and urlparse(link).netloc == base_domain:
-                    if len(processed_urls) < MAX_PAGES:
-                        urls_to_crawl.append(link)
-                    else:
-                        break
-
-        time.sleep(1)
-
-    print("\nRastreo completado. Todos los resultados han sido guardados en la base de datos (simulado para pruebas locales).")
-    # print(f"Puedes inspeccionar la base de datos '{DB_NAME}' usando una herramienta de SQLite.")
+# El bloque if __name__ == "__main__": se elimina por completo
+# ya que es solo para pruebas locales y la lógica de ejecución principal
+# y el control del número de URLs se manejan en master.py (o un equivalente)
+# cuando la aplicación se despliega en producción con Uvicorn/FastAPI.
